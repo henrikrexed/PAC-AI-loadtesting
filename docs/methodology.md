@@ -3,7 +3,7 @@
 *ISI-4045 · Phase 2 of the PAC "Loadtesting & AI" track ([ISI-4032](/ISI/issues/ISI-4032), plan rev 1, approved 2026-09-08)*
 *Builds on: [`research/loadtesting-from-observability.md`](../research/loadtesting-from-observability.md)*
 
-**Version:** 0.1 (draft) · **Status:** awaiting board validation (Gate V1) on this document itself — we apply the methodology to its own delivery: nothing is "final" until a human validates it.
+**Version:** 0.2 (draft, O11y-reviewed) · **Status:** awaiting board validation (Gate V1) on this document itself — we apply the methodology to its own delivery: nothing is "final" until a human validates it.
 
 ---
 
@@ -22,7 +22,7 @@ Operating principles (normative — "MUST"):
 - **P1 — Human gate is mandatory.** No test executes against any environment before the workload model is explicitly approved by the responsible human (Gate V1). Never skipped, never retro-active, never auto-approved by telemetry or agent heuristics.
 - **P2 — Tests are code.** Every generated artifact is committed, diffable, and reviewable. Regenerating must be deterministic given the same workload model + seed.
 - **P3 — Every number comes from telemetry.** Rates, mixes, latencies, and payload shapes are derived from observability data. LLM-assisted synthesis is always shape-validated against baselines; hallucinated patterns are rejected, not patched by hand-waving.
-- **P4 — Test traffic is always identifiable.** All generated requests carry OTel baggage `synthetic=true` (propagated as `baggage` header) so test and production telemetry can be separated in DQL.
+- **P4 — Test traffic is always identifiable.** All generated requests carry OTel baggage `synthetic=true` (propagated as the W3C `baggage` header) so test and production telemetry can be separated in DQL. **Prerequisite (O11y):** baggage is a context-propagation mechanism and is *not* a queryable span attribute by default — the pipeline MUST promote it to a span/resource attribute so DQL can filter on it (SDK baggage span processor, or the collector `baggage`/`transform` processor copying `baggage.synthetic` → attribute `synthetic`). If this promotion is not in place, the ANALYZE filter (§3.5) matches nothing. See §7.7.
 - **P5 — Never production by default.** Targets MUST come from a non-production allowlist. Any production exception requires an explicit board approval recorded on the issue.
 
 ---
@@ -163,6 +163,13 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 ### 3.5 ANALYZE — shape-diff against production, then iterate
 
 **Objective:** prove (or disprove) that the test traffic *shape* matches the production baseline, in Dynatrace DQL.
+
+**Telemetry prerequisites (O11y — enforce before trusting any diff):**
+1. **Synthetic tag is queryable.** The `synthetic` attribute (promoted from baggage per P4) MUST be present on test spans. The runner asserts a non-zero count of `synthetic == true` spans in a warm-up probe before the diff is computed; zero means the promotion step is missing, not that shapes match.
+2. **Sampling parity.** Compare *rates*, not raw counts, and normalize for the sampling ratio of each dataset. If production is head/tail-sampled at ratio `s_prod` and the test at `s_test`, arrival-shape and fan-out comparisons use sampling-corrected rates; the applied `samplingFactor` is recorded in `shape-diff.json`. Mismatched, unrecorded sampling is the most common false "out of tolerance".
+3. **Scale factor is explicit.** When the test runs at reduced scale, the arrival-shape comparison divides the baseline by a recorded `scalingFactor` (test target RPS ÷ baseline RPS); it is stored in `shape-diff.json`, never inferred silently.
+
+> The illustrative DQL in §3.1 is a *representative* pack, not validated against a live tenant. Per the O11y query-validation gate, every query MUST be run against the target Dynatrace environment and its field names/functions (e.g. entry-span identification, error counting) confirmed against sample output before it is baked into the `baseline-diff`/`workload-model` skills.
 
 **Shape-diff dimensions and default tolerances** (overridable via `run-config.tolerances`):
 
@@ -432,6 +439,8 @@ loadtests/
 {
   "run": "<timestamp>",
   "baselineTimeframe": "…",
+  "scalingFactor": 0.25,
+  "samplingFactor": { "prod": 0.05, "test": 1.0 },
   "dimensions": {
     "arrivalShape":   { "metric": "wmape", "value": 0.14, "tolerance": 0.20, "pass": true },
     "latency":        { "p50Rel": 0.08, "p95Rel": 0.19, "p99Rel": 0.27, "pass": true },
@@ -468,6 +477,7 @@ Invariant: **V1 approval hash-bound to model revision** is the anchor of the who
 4. Synthetic payloads only — production data is never copied into payload pools; generators are PII-free by construction.
 5. Runs are scheduled windows, recorded with full config for replay; abort causes are part of `run-report.md`.
 6. Everything committed (P2): model, scripts, payloads, configs, diffs, reports.
+7. **Synthetic-tag promotion (O11y prerequisite for P4/§3.5).** The OTel pipeline MUST copy baggage `synthetic` onto spans as a queryable attribute — via the SDK baggage span processor or a collector `transform`/`baggage` processor — and a warm-up probe MUST confirm a non-zero `synthetic == true` span count before ANALYZE runs. Without this, `synthetic=true` is invisible to DQL and test/prod telemetry cannot be separated.
 
 ---
 
@@ -501,5 +511,6 @@ Presentation storyline: *we already delegate execution credibly (evidence) → h
 ## 10. Document status
 
 - v0.1 drafted by backup_Architect, 2026-09-08, per [ISI-4045](/ISI/issues/ISI-4045).
+- v0.2 O11y review by Observability Agent, 2026-09-08: added baggage→attribute promotion prerequisite (P4, §7.7), sampling-parity + explicit scaling in ANALYZE (§3.5), DQL query-validation gate note, and `scalingFactor`/`samplingFactor` in `shape-diff.json`. Review verdict: **approved from the observability standpoint; acceptance criteria met** — loop and gates are precise enough to build skills against.
 - Pending Gate-V1-style board validation of this document (approval of the methodology itself, mirroring §3.2).
 - Phase 3 ([ISI-4046](/ISI/issues/ISI-4046)) consumes §8; Phase 4 demo ([ISI-4047](/ISI/issues/ISI-4047)) executes §3 end-to-end on one target; Phase 5 deck ([ISI-4048](/ISI/issues/ISI-4048)) narrates §1–§2.
