@@ -1,0 +1,143 @@
+# PAC-LT Phase 4 T0 — dedicated baggage-promotion + Dynatrace-export collector
+# ISI-4089. Interposes on the memory-benchmark otel-demo telemetry path WITHOUT
+# touching the shared `observability/otel-collector` (which carries the
+# ISI-1988/ISI-1921 benchmark_only DT tap — MUST NOT be modified).
+#
+# How it interposes: the otel-demo services export to an ExternalName Service
+# `otel-collector` in the otel-demo namespace (the ISI-3226 alias). We repoint
+# THAT alias at this collector (see §repoint below). No demo pod restart needed.
+#
+# Pipeline (critical-rule order: memory_limiter FIRST, batch LAST):
+#   otlp -> memory_limiter -> transform/baggage (promote) -> resource/pac-lt -> batch
+#         -> [ otlphttp/dynatrace (oat05854), otlphttp/local (preserve Tempo/LGTM) ]
+#
+# Isolation design:
+#   - resource/pac-lt stamps  deployment.environment = pac-lt-t0  on ALL demo
+#     telemetry  -> DQL isolates OUR demo from the ambient (NULL-k8s) otel-demo
+#     traffic already in oat05854.
+#   - transform/baggage promotes span attr  baggage.synthetic == "true"  to a
+#     first-class queryable attribute  synthetic = "true"  -> the ANALYZE filter
+#     `synthetic == true` separates k6 test traffic from the loadgen baseline
+#     WITHIN pac-lt-t0. Baseline (loadgen) traffic carries no baggage.synthetic
+#     -> stays unset -> counted as production baseline.
+#
+# NOT using k8sattributes (critical rule allows it here since this IS k8s, but
+# the deployment.environment tag already gives full isolation and it keeps the
+# footprint/RBAC to zero). NOT using resourcedetection (that rule is VM-only).
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pac-lt-collector
+  namespace: otel-demo
+  labels: { app: pac-lt-collector, pac.lt/issue: ISI-4089 }
+data:
+  collector.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    processors:
+      # CRITICAL RULE: memory_limiter MUST be the first processor.
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+        spike_limit_mib: 100
+      # Baggage -> attribute promotion. Reads the span attribute the SDK/probe
+      # carries (baggage.synthetic) and lifts it to a top-level queryable attr.
+      transform/baggage:
+        error_mode: ignore
+        trace_statements:
+          - context: span
+            statements:
+              - set(attributes["synthetic"], "true") where attributes["baggage.synthetic"] == "true"
+      # Distinctive tag so DQL can isolate THIS deployment from ambient otel-demo.
+      resource/pac-lt:
+        attributes:
+          - { key: deployment.environment, value: pac-lt-t0, action: upsert }
+          - { key: pac.lt.issue,           value: ISI-4089,  action: upsert }
+      # DT OTLP requires DELTA temporality for cumulative sums/histograms.
+      cumulativetodelta: {}
+      # CRITICAL RULE: batch MUST be the last processor.
+      batch:
+        send_batch_size: 1024
+        timeout: 5s
+    exporters:
+      otlphttp/dynatrace:
+        endpoint: ${env:DT_OTLP_ENDPOINT}
+        headers:
+          Authorization: "Api-Token ${env:DT_API_TOKEN}"
+        compression: gzip
+        timeout: 30s
+        retry_on_failure: { enabled: true, initial_interval: 5s, max_interval: 30s, max_elapsed_time: 300s }
+        sending_queue: { enabled: true, queue_size: 5000 }
+      # Preserve the demo's existing local telemetry (Tempo/LGTM) — non-destructive.
+      # Points at the REAL FQDN of the shared collector, not the alias (no loop).
+      otlphttp/local:
+        endpoint: http://otel-collector.observability.svc.cluster.local:4318
+        compression: gzip
+        retry_on_failure: { enabled: true }
+    service:
+      telemetry:
+        metrics: { level: basic }
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/baggage, resource/pac-lt, batch]
+          exporters: [otlphttp/dynatrace, otlphttp/local]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/pac-lt, batch]
+          exporters: [otlphttp/dynatrace, otlphttp/local]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/pac-lt, cumulativetodelta, batch]
+          exporters: [otlphttp/dynatrace, otlphttp/local]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pac-lt-collector
+  namespace: otel-demo
+  labels: { app: pac-lt-collector, pac.lt/issue: ISI-4089 }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: pac-lt-collector } }
+  template:
+    metadata:
+      labels: { app: pac-lt-collector, pac.lt/issue: ISI-4089 }
+      annotations: { sidecar.istio.io/inject: "false" }
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.135.0
+          args: ["--config=/etc/collector/collector.yaml"]
+          env:
+            - name: DT_OTLP_ENDPOINT
+              valueFrom: { secretKeyRef: { name: dt-otlp-token, key: tenantUrl } }
+            - name: DT_API_TOKEN
+              valueFrom: { secretKeyRef: { name: dt-otlp-token, key: apiToken } }
+          ports:
+            - { containerPort: 4317, name: otlp-grpc }
+            - { containerPort: 4318, name: otlp-http }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: config, mountPath: /etc/collector }
+      volumes:
+        - name: config
+          configMap: { name: pac-lt-collector }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pac-lt-collector
+  namespace: otel-demo
+  labels: { app: pac-lt-collector, pac.lt/issue: ISI-4089 }
+spec:
+  selector: { app: pac-lt-collector }
+  ports:
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+    - { name: otlp-http, port: 4318, targetPort: 4318 }
