@@ -35,10 +35,12 @@ This runbook cannot complete from the current ProxOps runner. All three are owne
    client cert are both rejected (cert rotation since 2026-07-28). Refresh it.
 2. **`DEEPSEEK_API_KEY`** — a DeepSeek API key (platform.deepseek.com). Deliver via Paperclip
    `adapterConfig.secretEnv`, never commit.
-3. **`DT_API_TOKEN`** — a Dynatrace oat05854 OTLP ingest token (`openTelemetryTrace.ingest`,
-   plus metrics/logs if desired). Same delivery path as the ISI-4089 `dt-otlp-token`.
+3. **DT oat05854 OTLP token** — *not a new secret*: the ISI-4089 `dt-otlp-token` already exists
+   in the cluster (namespace `otel-demo`) and §3 copies it into `agentapp`. Only mint a new one
+   if that secret is gone.
 
-Container build also needs a registry the cluster can pull from (`REGISTRY` below).
+Container build also needs a registry the cluster can pull from (`REGISTRY` below). So the real
+owner-provided blockers reduce to **(1) a valid cluster kubeconfig** and **(2) a DeepSeek API key**.
 
 ---
 
@@ -65,11 +67,17 @@ sed -i "s#REGISTRY/crewai-deepseek-agent:0.1.0#$REGISTRY/crewai-deepseek-agent:0
 
 ```sh
 kubectl apply -f deploy/agentapp/k8s/namespace.yaml
+
+# DeepSeek key (the one true new secret — owner-provided via Paperclip secretEnv):
 kubectl -n agentapp create secret generic deepseek-api \
   --from-literal=apiKey="$DEEPSEEK_API_KEY"
-kubectl -n agentapp create secret generic dt-otlp-token \
-  --from-literal=tenantUrl="https://oat05854.live.dynatrace.com/api/v2/otlp" \
-  --from-literal=apiToken="$DT_API_TOKEN"
+
+# DT OTLP token: REUSE the existing ISI-4089 in-cluster secret rather than minting a new one.
+# Copy it from the otel-demo namespace into agentapp (no new token required):
+kubectl -n otel-demo get secret dt-otlp-token -o yaml \
+  | sed 's/namespace: otel-demo/namespace: agentapp/' \
+  | kubectl apply -n agentapp -f -
+# (Only mint a new token — and use secret.example.yaml — if that secret is absent.)
 ```
 
 ## 4. Deploy
