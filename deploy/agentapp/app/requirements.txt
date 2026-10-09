@@ -1,0 +1,9 @@
+# Pins are a known-good baseline; the smoke test (README §5) validates the CrewAI LLM.call
+# signature that TracedLLM overrides. Bump within the same minor if the smoke test flags drift.
+crewai==0.86.0
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+pydantic==2.10.3
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-http==1.29.0

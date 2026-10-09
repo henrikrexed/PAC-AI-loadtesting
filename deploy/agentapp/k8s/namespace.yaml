@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentapp
+  labels:
+    pac.lt/issue: ISI-5644
+    # Non-prod generalization test workload. Istio sidecar injection left off to keep the
+    # span tree exactly the shape the app emits (no envoy spans interleaved).
+    istio-injection: disabled
