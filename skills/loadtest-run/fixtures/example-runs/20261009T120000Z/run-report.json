@@ -1,0 +1,110 @@
+{
+  "abort": {
+    "errorRateGt": 0.05,
+    "p95MsGt": 2500,
+    "p99MsGt": 4000
+  },
+  "abortReason": null,
+  "arrival": {
+    "achievedRps": 190.0,
+    "achievedVsTarget": 0.95,
+    "targetRps": 200.0
+  },
+  "caps": {
+    "maxDuration": "30m",
+    "maxRps": 400,
+    "maxVus": 200
+  },
+  "gates": {
+    "preflight": {
+      "checks": [
+        {
+          "detail": "env=staging allowlist=True nonprod=True",
+          "id": "allowlist-nonprod",
+          "passed": true
+        },
+        {
+          "detail": "v2a.passed=True v2a.commit=abc123 current=abc123",
+          "id": "v2a-passed-on-commit",
+          "passed": true
+        },
+        {
+          "detail": "decision=approved approvalRev=3 modelRev=3 hashMatch=True",
+          "id": "approval-valid",
+          "passed": true
+        },
+        {
+          "detail": "caps={'maxRps': 400, 'maxVus': 200, 'maxDuration': '30m'} abort={'errorRateGt': 0.05, 'p95MsGt': 2500, 'p99MsGt': 4000} baselineP99=1500.0 p99ThresholdOk=True",
+          "id": "caps-abort-armed",
+          "passed": true
+        },
+        {
+          "detail": "smoke gate passed=True",
+          "id": "smoke-passed",
+          "passed": true
+        },
+        {
+          "detail": "runs/<ts>/ exists=True",
+          "id": "run-dir",
+          "passed": true
+        }
+      ],
+      "gate": "V2b",
+      "passed": true
+    },
+    "smoke": {
+      "checks": [
+        {
+          "detail": "0 5xx responses",
+          "id": "1-no-5xx",
+          "passed": true
+        },
+        {
+          "detail": "0 steps without downstream span, 0 404s",
+          "id": "2-routes-reachable",
+          "passed": true
+        },
+        {
+          "detail": "0 null-extract failures",
+          "id": "3-correlation",
+          "passed": true
+        },
+        {
+          "detail": "TVD=0.000 (max 0.30)",
+          "id": "4-journey-mix",
+          "passed": true
+        },
+        {
+          "detail": "42 synthetic==true spans in backend (baggage promotion confirmed)",
+          "id": "5-synthetic-visible",
+          "passed": true
+        },
+        {
+          "detail": "0 dropped iterations",
+          "id": "6-no-dropped",
+          "passed": true
+        }
+      ],
+      "gate": "V2b-smoke",
+      "passed": true
+    }
+  },
+  "modelRef": {
+    "hash": "sha256:deadbeef",
+    "name": "checkout",
+    "revision": 3
+  },
+  "run": "20261009T120000Z",
+  "sampleCount": 2,
+  "target": {
+    "allowlist": true,
+    "baseUrl": "https://staging.internal",
+    "environment": "staging"
+  },
+  "telemetry": {
+    "environment": "staging-dt-tenant",
+    "filter": "synthetic == true",
+    "timeframe": "-15m"
+  },
+  "verdict": "passed"
+}
