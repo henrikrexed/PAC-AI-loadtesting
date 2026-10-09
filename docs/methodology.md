@@ -51,6 +51,24 @@ flowchart TD
 
 The loop is **per target service, per scenario**, and each turn of the loop is a numbered run under `loadtests/<target>/runs/`.
 
+### 2.1 Component architecture — backend- and tool-agnostic workload-model engine
+
+Per board direction ([ISI-5622](/ISI/issues/ISI-5622), 2026-10-09), the solution is factored into **three decoupled layers** so the core logic is reusable across any observability backend and any load-testing tool. Extraction and modeling are no longer one skill: the thing that *turns telemetry into scenarios/load/ramp/dataset* is a standalone, agnostic utility.
+
+1. **Input adapters (backend-specific, agent-driven).** The agent pulls raw telemetry from whatever backend is in play (Dynatrace/dtctl, Tempo/Jaeger, Istio/Envoy access logs, raw OTLP, …) and normalizes it into a single **neutral telemetry interchange schema** (traces + HTTP request records + arrival/timing stats + sampling metadata). Only this layer knows about dtctl/DQL. Swapping backends = swapping an adapter.
+
+2. **Workload-model engine (agnostic utility — the component to build).** A deterministic, offline-testable utility: **input** = the neutral interchange schema, **output** = the workload model. It performs front-end discovery, 1–6 chained scenario clustering (~80% coverage), per-scenario load (TPS + VUs via Little's Law), ramp-up/down shaping, and cache-avoidance dataset sizing. It knows nothing about Dynatrace or k6 — pure *telemetry-in / model-out*. This is where fidelity lives (clustering, correlation, arrival shaping, Zipf sizing). Output conforms to the §4 `workload-model.json` schema.
+
+3. **Output renderers (tool-specific).** A renderer turns `workload-model.json` into runnable scripts for the user's chosen tool — **k6 first for our pod**, with the same model renderable to JMeter, Locust, Gatling, etc. behind a common renderer interface. Swapping tools = swapping a renderer; the model and engine are untouched.
+
+```
+backend        →  [input adapter]      →  neutral telemetry   →  [WORKLOAD-MODEL ENGINE]  →  workload-model.json  →  [renderer]       →  k6 | JMeter | Locust | Gatling
+(Dynatrace,        (backend-specific)      (interchange schema)   (agnostic utility)          (§4 schema)             (tool-specific)
+ Istio logs, …)
+```
+
+Two contracts make the layers independently buildable and the engine independently testable against recorded fixtures: the **neutral telemetry interchange schema** (adapter → engine) and the existing **§4 workload-model schema** (engine → renderer). Designing the engine and these two contracts is the subject of research spike [ISI-5634](/ISI/issues/ISI-5634).
+
 ---
 
 ## 3. Stage specifications
@@ -656,6 +674,8 @@ Invariant: **V1 approval hash-bound to model revision** is the anchor of the who
 | ANALYZE | `baseline-diff` | DQL diff (synthetic filter), tolerance eval, iteration classifier, escalation report | input: run + baseline; output: `shape-diff.json` + decision |
 
 Phase 3 decides build-skill vs use-MCP per row (e.g., Grafana Assistant / Speedscale / Tracetest as buy-side alternatives for rows 2–4).
+
+**Agnostic-engine refactor ([ISI-5622](/ISI/issues/ISI-5622), 2026-10-09 board direction — see §2.1).** Row 1 (SCOPE) separates into a **backend-specific input adapter** (the agent's dtctl/DQL + Istio-log pull, emitting the neutral telemetry interchange schema) and the **backend-agnostic workload-model engine** (§2.1 layer 2) that consumes it. Row 3 (SYNTHESIZE) becomes the **first of several tool-specific renderers** (k6 now; JMeter/Locust/Gatling behind the same interface). The engine and its two contracts are being designed under research spike **[ISI-5634](/ISI/issues/ISI-5634)**; the directly-affected Phase-3 skill issues ([ISI-5630](/ISI/issues/ISI-5630) SCOPE, [ISI-5631](/ISI/issues/ISI-5631) SYNTHESIZE) are re-scoped to this split and gated on that spike. Rows 4–5 ([ISI-5632](/ISI/issues/ISI-5632) EXECUTE, [ISI-5633](/ISI/issues/ISI-5633) ANALYZE) are unaffected — they consume `run-config.json` (§5.3) / the §4 model / `shape-diff.json` (§5.4), whose contracts the refactor does not change.
 
 ---
 
