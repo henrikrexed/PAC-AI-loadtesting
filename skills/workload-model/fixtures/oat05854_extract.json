@@ -1,0 +1,47 @@
+{
+  "_comment": "Live extraction facts captured from Dynatrace tenant oat05854 (dynatrace-dev dtctl context) on 2026-10-09 by the workload-model skill. Every number here came from a dtctl DQL query run live against the tenant; the queries are listed in metadata.source.queries of the emitted model. This fixture is the deterministic input to build_example.py and the test suite.",
+  "environment": "oat05854",
+  "timeframe": "-3h (2026-10-09, deploy-free/incident-free window)",
+  "window_seconds": 10800,
+  "access_log_availability": "unavailable",
+  "access_log_probe": "fetch logs | filter k8s.container.name == 'istio-proxy' -> 0 lines; no istio/envoy containers; no request_id log field. Mesh access logs not shipped on this tenant.",
+  "sampling_ratio": 1.0,
+  "front_end": {
+    "resolved": "frontend-proxy",
+    "resolved_op": "ingress",
+    "method": "earliest-start root span per trace + noise classifier + edge-server fallback; load-generator user_* driver present and preferred for this non-prod window",
+    "ingress_crosscheck": "N/A — no istio-ingressgateway access logs on tenant; edge server frontend-proxy/ingress used as the mesh-edge equivalent and reach-confirmed"
+  },
+  "journeys": [
+    {"op": "user_browse_product",          "traces": 2529, "svc_set": ["frontend","load-generator","frontend-proxy","product-catalog"]},
+    {"op": "user_add_to_cart",             "traces": 1527, "svc_set": ["cart","frontend","load-generator","frontend-proxy","product-catalog"]},
+    {"op": "user_get_ads",                 "traces": 818,  "svc_set": ["frontend","load-generator","frontend-proxy","ad"]},
+    {"op": "user_get_recommendations",     "traces": 774,  "svc_set": ["frontend","load-generator","frontend-proxy","recommendation","product-catalog"]},
+    {"op": "user_view_cart",               "traces": 761,  "svc_set": ["cart","frontend","load-generator","frontend-proxy"]},
+    {"op": "user_get_product_reviews",     "traces": 588,  "svc_set": ["frontend","load-generator","frontend-proxy","product-reviews"]},
+    {"op": "user_checkout_single",         "traces": 267,  "svc_set": ["email","cart","currency","shipping","frontend","load-generator","quote","flagd","frontend-proxy","payment","product-catalog","checkout"]},
+    {"op": "user_checkout_multi",          "traces": 265,  "svc_set": ["email","cart","currency","shipping","frontend","load-generator","quote","flagd","frontend-proxy","payment","product-catalog","checkout"]},
+    {"op": "user_index",                   "traces": 236,  "svc_set": ["frontend","load-generator","frontend-proxy"]},
+    {"op": "user_ask_product_ai_assistant","traces": 231,  "svc_set": ["frontend","load-generator","frontend-proxy","product-reviews"]}
+  ],
+  "per_minute_cov": {"meanRpm": 44.19, "sd": 5.45, "cov": 0.1233, "minRpm": 6, "maxRpm": 57, "bins": 181},
+  "server_baseline_frontend": {"p50_ms": 3, "p95_ms": 15813, "p99_ms": 63252, "mean_ms": 2018, "p90_ms": 13, "count": 19872, "errs": 0},
+  "server_rate_tps": 1.836,
+  "observed_concurrency": 3.7,
+  "route_baselines": {
+    "GET /api/products/[productId]/index":            {"p50": 2,     "p95": 3,      "p99": 4,      "cnt": 4047},
+    "POST /api/cart":                                  {"p50": 3,     "p95": 5,      "p99": 7,      "cnt": 1525},
+    "GET /api/cart":                                   {"p50": 2,     "p95": 3,      "p99": 4,      "cnt": 767},
+    "GET /api/data":                                   {"p50": 2,     "p95": 3,      "p99": 3,      "cnt": 820},
+    "GET /api/recommendations":                        {"p50": 12,    "p95": 15,     "p99": 20,     "cnt": 773},
+    "GET /api/product-reviews/[productId]/index":      {"p50": 12,    "p95": 16,     "p99": 20,     "cnt": 589},
+    "POST /api/checkout":                              {"p50": 53188, "p95": 106377, "p99": 150441, "cnt": 528},
+    "GET /":                                           {"p50": 4,     "p95": 5,      "p99": 6,      "cnt": 243},
+    "POST /api/product-ask-ai-assistant/[productId]/index": {"p50": 30, "p95": 39,   "p99": 46,     "cnt": 234}
+  },
+  "product_keys": {
+    "distinct": 10,
+    "reads": 9032,
+    "access_counts": {"2ZYFJ3GM2N": 1001, "66VCHSJNUP": 947, "6E92ZMYYFZ": 921, "0PUK6V6EV0": 908, "9SIQT8TOJO": 905, "HQTGWGPNH4": 900, "L9ECAV7KIM": 895, "1YMWWN1N4O": 864, "OLJCESPC7Z": 856, "LS4PSXUNUM": 819}
+  }
+}
