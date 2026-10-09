@@ -28,10 +28,14 @@ from dataclasses import dataclass, field
 
 from clustering import Journey
 
-# Services whose presence in a trace's downstream set means an order was placed.
-# Matched as substrings (case-insensitive) so it generalizes across tenants /
-# naming schemes (payment-svc, checkoutservice, order-processor, ...).
+# Services/operations whose presence in a trace means the flow reached a *terminal action
+# class*. Matched as substrings (case-insensitive) so they generalize across tenants/naming.
+# Commerce: an order was placed. The classifier below is domain-agnostic — swap the pattern
+# set to model any binary behavioral split (see AGENTIC_TOOL_PATTERNS for the agent-app case
+# validated live on openclaw-gateway, ISI-5630 generalization test).
 ORDER_TERMINAL_PATTERNS = ("payment", "checkout", "charge", "placeorder", "order")
+# Agentic apps: did the agent turn invoke a tool (ReAct loop) vs stay pure-LLM (conversational)?
+AGENTIC_TOOL_PATTERNS = ("execute_tool", "tool.", "/tool", "function_call")
 
 
 @dataclass
@@ -47,10 +51,46 @@ class Archetype:
     weight: float = 0.0
 
 
-def places_order(svc_set, *, patterns: tuple[str, ...] = ORDER_TERMINAL_PATTERNS) -> bool:
-    """True if the downstream service set reaches an order-terminal service."""
-    rx = re.compile("|".join(patterns), re.IGNORECASE)
+def reaches_terminal(svc_set, patterns: tuple[str, ...]) -> bool:
+    """True if any element of the flow's downstream set matches a terminal-action pattern."""
+    rx = re.compile("|".join(re.escape(p) for p in patterns), re.IGNORECASE)
     return any(rx.search(s) for s in svc_set)
+
+
+def places_order(svc_set, *, patterns: tuple[str, ...] = ORDER_TERMINAL_PATTERNS) -> bool:
+    """Commerce specialization: does the flow reach an order-terminal service?"""
+    return reaches_terminal(svc_set, patterns)
+
+
+def classify_by_terminal(
+    journeys: list[Journey],
+    *,
+    patterns: tuple[str, ...],
+    present: tuple[str, str],   # (id, name) for flows that reach the terminal action
+    absent: tuple[str, str],    # (id, name) for flows that do not
+    present_steps: list[dict] | None = None,
+    absent_steps: list[dict] | None = None,
+) -> list[Archetype]:
+    """Domain-agnostic behavioral split by a terminal-action signal.
+
+    Commerce (`to_archetypes`) and agentic apps (tool-using vs pure-LLM turns) are both just
+    configurations of this one function — the §2.1 agnostic-engine thesis in code. Pure:
+    step sequences are injected by the caller (reconstructed from the trace span-tree).
+    """
+    hit = Archetype(id=present[0], name=present[1], places_order=True, steps=present_steps or [])
+    miss = Archetype(id=absent[0], name=absent[1], places_order=False, steps=absent_steps or [])
+    for j in journeys:
+        target = hit if reaches_terminal(j.svc_set, patterns) else miss
+        target.members.append(j.op)
+        target.traces += j.traces
+        target.reach = max(target.reach, j.reach)
+        target.svc_set = target.svc_set | frozenset(j.svc_set)
+    result = [a for a in (hit, miss) if a.members]
+    total = sum(a.traces for a in result) or 1
+    for a in result:
+        a.weight = a.traces / total
+    result.sort(key=lambda a: a.weight, reverse=True)
+    return result
 
 
 def to_archetypes(
@@ -67,24 +107,14 @@ def to_archetypes(
     this stays a pure function — the caller runs the reconstruction query and passes results.
     Returns archetypes sorted by weight desc, each with its summed traces and merged svc_set.
     """
-    buyer = Archetype(id="buyer", name="Buyer — browse, add to cart, place order",
-                      places_order=True, steps=buyer_steps or [])
-    browser = Archetype(id="browser", name="Browser — search & browse (no order)",
-                        places_order=False, steps=browser_steps or [])
-
-    for j in journeys:
-        target = buyer if places_order(j.svc_set, patterns=patterns) else browser
-        target.members.append(j.op)
-        target.traces += j.traces
-        target.reach = max(target.reach, j.reach)
-        target.svc_set = target.svc_set | frozenset(j.svc_set)
-
-    result = [a for a in (buyer, browser) if a.members]
-    total = sum(a.traces for a in result) or 1
-    for a in result:
-        a.weight = a.traces / total
-    result.sort(key=lambda a: a.weight, reverse=True)
-    return result
+    return classify_by_terminal(
+        journeys,
+        patterns=patterns,
+        present=("buyer", "Buyer — browse, add to cart, place order"),
+        absent=("browser", "Browser — search & browse (no order)"),
+        present_steps=buyer_steps,
+        absent_steps=browser_steps,
+    )
 
 
 def coverage(archetypes: list[Archetype]) -> float:

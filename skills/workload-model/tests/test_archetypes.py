@@ -66,6 +66,29 @@ def test_buyer_steps_are_a_multistep_funnel_with_correlates():
     assert any(c["sourceStepId"] == "s2" for c in checkout["correlates"])
 
 
+def test_classifier_generalizes_to_agentic_app_openclaw():
+    # GENERALIZATION (ISI-5630): the SAME engine classifies an agent app by tool-use, not
+    # commerce. Mirrors the live openclaw-gateway shape: tool-using turns vs pure-LLM turns.
+    turns = [
+        cl.Journey(op="agent.turn.websearch", traces=4,
+                   svc_set={"openclaw-gateway", "execute_tool web_search"}),
+        cl.Journey(op="agent.turn.exec", traces=6,
+                   svc_set={"openclaw-gateway", "execute_tool exec"}),
+        cl.Journey(op="agent.turn.chat", traces=14, svc_set={"openclaw-gateway"}),  # pure LLM
+    ]
+    a = {x.id: x for x in ar.classify_by_terminal(
+        turns,
+        patterns=ar.AGENTIC_TOOL_PATTERNS,
+        present=("agentic", "Agentic — tool-using turn"),
+        absent=("conversational", "Conversational — pure-LLM turn"),
+    )}
+    assert set(a) == {"agentic", "conversational"}
+    assert set(a["agentic"].members) == {"agent.turn.websearch", "agent.turn.exec"}
+    assert a["conversational"].members == ["agent.turn.chat"]
+    # pure-LLM dominates (14 of 24) — matches the live 77.8%/22.2% split direction
+    assert a["conversational"].weight > a["agentic"].weight
+
+
 def test_browser_steps_are_readonly_no_order():
     a = {x.id: x for x in ar.to_archetypes(_journeys(),
                                            buyer_steps=FX["buyer_steps"],
