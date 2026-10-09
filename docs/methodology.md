@@ -686,7 +686,13 @@ Presentation storyline: *we already delegate execution credibly (evidence) → h
   - 4 open questions for Henrik in `docs/phase-g1g3-observability-extraction.md` §Open questions: front-end semantics in prod vs non-prod windows, ramp demo approach, Jaccard threshold tuning, think-time distribution default.
   - **4 unclosed fidelity residuals carried as explicit caveats in §11** (R1/R2/R5/R8–R10) — per the [synthesis reconciliation §6.3](/ISI/issues/ISI-5628#document-synthesis); must not be dropped amid the G1–G5 gap-closures.
 - v0.4 Gate-V1 feedback fold by BigBoss, 2026-10-09, per [ISI-5622](/ISI/issues/ISI-5622): Henrik **rejected Gate-V1 on v0.3** with "we also should rely on the logs of the istio proxy to get the http requests." Added **dual-source extraction** to SCOPE §3.1: a new **step 2b (Envoy/Istio access-log extraction + span fusion)** plus Inputs, Gate-G0 exit criteria (access-log availability + per-step evidence-source tagging), and skill-boundary updates. Envoy access logs now provide the authoritative instrumentation-independent HTTP surface (method/path/status), resolve the front-end tiebreak at `istio-ingressgateway`, and supply the `x-request-id` chaining backbone; spans remain the source for topology/fan-out. Fusion joins on `trace.id`≈`x-request-id`.
-  - **Pending Gate-V1 (round 2) board validation of v0.4** — fresh `request_confirmation` bound to the new plan revision.
+  - **Gate-V1 (round 2) APPROVED** by the board (local-board), 2026-10-09, on plan revision `0a74ca10` — v0.4 greenlit for Phase-3 implementation. This is the mandatory §3.2 human gate; it is now satisfied.
+  - **Phase-3 implementation track spawned** from the approved plan (BigBoss, per [ISI-5622](/ISI/issues/ISI-5622)): one child issue per §8 skill-map row —
+    - [ISI-5630](/ISI/issues/ISI-5630) SCOPE → `workload-model` (dual-source extraction, front-end discovery, 1–6 scenario clustering, load+ramp, `cacheProfile`, G0) → Observability Agent;
+    - [ISI-5631](/ISI/issues/ISI-5631) SYNTHESIZE → `k6-synthesis` (codegen, G2 chaining, G4 cache-avoidance payloads, `synthetic==true` span emission, G3 ramp executors, V2a) → Testing Architect;
+    - [ISI-5632](/ISI/issues/ISI-5632) EXECUTE → `loadtest-run` (scoped executor, caps/abort §7, G5 smoke + V2b-smoke gate, run-report) → Testing Architect;
+    - [ISI-5633](/ISI/issues/ISI-5633) ANALYZE → `baseline-diff` (§3.5 shape-diff, synthetic filter, tolerance eval, iteration classifier, R5 infra cross-check) → Observability Agent.
+    - §11 residuals are carried as explicit caveats inside the relevant child issues; R8/R9/R10 governance stays with BigBoss/Henrik.
 - Phase 3 ([ISI-4046](/ISI/issues/ISI-4046)) consumes §8; Phase 4 demo ([ISI-4047](/ISI/issues/ISI-4047)) executes §3 end-to-end on one target; Phase 5 deck ([ISI-4048](/ISI/issues/ISI-4048)) narrates §1–§2.
 
 ## 11. Known fidelity residuals (v0.3 watch-list)
