@@ -63,6 +63,9 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 
 **Inputs:**
 - Dynatrace environment (dtctl profile) — **the target service is NOT assumed up front; SCOPE discovers it** (see step 2a)
+- **Two complementary telemetry sources, fused (see step 2b):**
+  - **OTel spans** (distributed traces) — service-graph topology, trace structure, parent/child fan-out.
+  - **Istio/Envoy access logs** (sidecar + ingress-gateway) — exhaustive, instrumentation-independent HTTP request enumeration (method, path, authority, status, duration) and the `x-request-id` correlation backbone. Added per Gate-V1 board feedback: spans alone miss un-instrumented hops and abstract exact paths/status into `span.name`; Envoy logs capture every mesh request verbatim.
 - analysis timeframe (default: last 7 days, peak-inclusive; MUST exclude deploy windows and incidents)
 - repo/commit of the service code (for journey→code linking)
 
@@ -123,6 +126,32 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 
    - Service-graph fan-out (downstream call edges and rates from traces).
 
+   **2b. Envoy/Istio access-log extraction + span fusion (new — Gate-V1 board feedback).** Spans give topology and trace structure; **Istio sidecar/ingress-gateway Envoy access logs give the authoritative, instrumentation-independent HTTP request record.** Extract both and fuse them.
+
+   - **Why both.** OTel spans only exist for instrumented services and often collapse the HTTP detail into `span.name` (e.g. `GET /api/products/{id}` or just `router products`). Envoy logs every request crossing the mesh verbatim — exact `method`, `path` (incl. query), `authority`/host, `response_code`, `response_flags`, `duration`, `upstream_service_time`, byte counts, `user_agent`, and the propagated `x-request-id`. They fill the gaps spans leave (un-instrumented hops, sampled-out traces) and are the ground truth for the HTTP surface each journey actually exercises.
+
+   - **Query (DQL via dtctl — logs pipeline).** Access logs reach Grail as log records when the mesh ships them (Istio `Telemetry` API access-log provider, or `meshConfig.accessLogFile`). Enumerate the HTTP request surface at the edge:
+     ```sql
+     -- Envoy access-log HTTP surface at the ingress gateway
+     fetch logs, from: -7d
+     | filter k8s.container.name == "istio-proxy"
+     | filter isNotNull(request_id)            -- Envoy JSON access-log line (not app log)
+     | summarize calls = count(),
+                 p95ms = percentile(duration, 95),
+                 errs  = countIf(toLong(response_code) >= 500),
+       by: { authority, method, path, response_code }
+     | sort calls desc | limit 200
+     ```
+     *Field names are Envoy's default JSON access-log keys (`method`, `path`, `authority`, `response_code`, `response_flags`, `duration`, `upstream_service_time`, `bytes_sent`, `request_id`, `upstream_host`, `downstream_remote_address`). They are provider-dependent and MUST be confirmed against the live tenant — mesh operators frequently customize the log format. Normalize `path` to a route template (strip ids/query) before weighting so high-cardinality paths don't fragment a journey.*
+
+   - **Front-end discovery, resolved at the edge (strengthens G1).** Requests logged by the **`istio-ingressgateway`** Envoy are the true application entry points. This is a more reliable front-end signal than root-span heuristics and **directly resolves the step-3 load-driver-vs-edge-server tiebreak**: filter the access-log query to `k8s.pod.name` / workload matching the ingress gateway to get the authoritative entry surface; cross-check it against the span-derived `entryService`.
+
+   - **Chaining backbone (strengthens G2).** Envoy propagates `x-request-id` across every hop of a user action. Grouping access-log lines `by: { request_id }` and sorting on `start_time` reconstructs the real ordered HTTP chain for a request — even across un-instrumented services — complementing the span-tree journey extraction and feeding the §3.3 `correlates` edges.
+
+   - **Fusion rule (spans ⟕ logs).** Join on `trace.id` ≈ `x-request-id` (Envoy sets `x-request-id`; when trace-context propagation is on it equals/maps to the trace id) plus a time window. Precedence: **topology & fan-out from spans; HTTP method/path/status & request enumeration from access logs; arrival curve and per-op volume from whichever source is complete** (prefer access logs when span sampling is active, since `Sampled: no` logs are unsampled at the proxy). Where a span exists, enrich it with the matching log's exact path/status; where no span exists, the access log stands alone and the step is flagged `spanless: true` in the journey.
+
+   - **Caveats / PII.** Access logging must be enabled in the mesh (confirm before relying on it — see exit criteria). Paths and headers can carry PII/secrets; strip/normalize before any value flows into the G4 dataset. Log volume at the gateway is high — scope the timeframe and pre-aggregate in DQL.
+
 3. **Journey extraction and scenario clustering to 1–6 named scenarios (G1 — new).**
    - Rank filtered entry operations by volume. Accumulate until cumulative weight ≥ **80%** of application entry traffic (coverage rule). Record per-journey weight and think-time distribution from inter-span gaps.
    - **Think-time per journey:** `think_time = load_driver_wrapper_duration − server_response_time`. This recovers the per-journey think-time distribution directly from telemetry for `spec.journeys[].steps[].thinkTime`.
@@ -155,8 +184,10 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 - [ ] `spec.payloads` entries with `cacheProfile.targetHitRatio > 0` carry a `keyCardinality` calculation — see §4
 - [ ] proposal names target environment from the allowlist and the requested blast-radius caps
 - [ ] all DQL queries have been run live against the target tenant and field names confirmed
+- [ ] **Istio/Envoy access-log availability confirmed** (log records present for `istio-proxy`; access-log field names verified) **or** the proposal explicitly records "access logs unavailable — spans-only extraction" as a known coverage caveat
+- [ ] **dual-source reconciliation recorded:** each journey's HTTP steps carry their evidence source (`span` / `accesslog` / `both`); steps seen only in access logs are flagged `spanless: true`
 
-**Skill boundary (Phase 3 input):** dtctl/DQL query pack (G1-C, G3-A, G3-B, latency, fan-out) + timeframe sanity; front-end discovery + noise classifier; span-tree journey extraction + Jaccard clustering to ≤6 scenarios; think-time recovery; CoV-gated ramp extraction; code-search linking; model emission + G0 self-validation.
+**Skill boundary (Phase 3 input):** dtctl/DQL query pack — **spans** (G1-C, G3-A, G3-B, latency, fan-out) **and Envoy access logs** (edge HTTP surface, `x-request-id` chaining) — + timeframe sanity; front-end discovery (span root heuristic reconciled with ingress-gateway access log) + noise classifier; span⟕log fusion on `trace.id`≈`x-request-id`; span-tree journey extraction + Jaccard clustering to ≤6 scenarios; think-time recovery; CoV-gated ramp extraction; code-search linking; model emission + G0 self-validation.
 
 ### 3.2 VALIDATE — mandatory human gate
 
@@ -654,7 +685,8 @@ Presentation storyline: *we already delegate execution credibly (evidence) → h
   - Schema delta: `correlates` on steps, `cacheProfile` on `payloadSpec`, `shape` on `arrivalProfile.stages`.
   - 4 open questions for Henrik in `docs/phase-g1g3-observability-extraction.md` §Open questions: front-end semantics in prod vs non-prod windows, ramp demo approach, Jaccard threshold tuning, think-time distribution default.
   - **4 unclosed fidelity residuals carried as explicit caveats in §11** (R1/R2/R5/R8–R10) — per the [synthesis reconciliation §6.3](/ISI/issues/ISI-5628#document-synthesis); must not be dropped amid the G1–G5 gap-closures.
-  - **Pending Gate-V1-style board validation of v0.3** — awaiting Henrik's confirmation.
+- v0.4 Gate-V1 feedback fold by BigBoss, 2026-10-09, per [ISI-5622](/ISI/issues/ISI-5622): Henrik **rejected Gate-V1 on v0.3** with "we also should rely on the logs of the istio proxy to get the http requests." Added **dual-source extraction** to SCOPE §3.1: a new **step 2b (Envoy/Istio access-log extraction + span fusion)** plus Inputs, Gate-G0 exit criteria (access-log availability + per-step evidence-source tagging), and skill-boundary updates. Envoy access logs now provide the authoritative instrumentation-independent HTTP surface (method/path/status), resolve the front-end tiebreak at `istio-ingressgateway`, and supply the `x-request-id` chaining backbone; spans remain the source for topology/fan-out. Fusion joins on `trace.id`≈`x-request-id`.
+  - **Pending Gate-V1 (round 2) board validation of v0.4** — fresh `request_confirmation` bound to the new plan revision.
 - Phase 3 ([ISI-4046](/ISI/issues/ISI-4046)) consumes §8; Phase 4 demo ([ISI-4047](/ISI/issues/ISI-4047)) executes §3 end-to-end on one target; Phase 5 deck ([ISI-4048](/ISI/issues/ISI-4048)) narrates §1–§2.
 
 ## 11. Known fidelity residuals (v0.3 watch-list)
