@@ -67,7 +67,14 @@ backend        →  [input adapter]      →  neutral telemetry   →  [WORKLOAD
  Istio logs, …)
 ```
 
-Two contracts make the layers independently buildable and the engine independently testable against recorded fixtures: the **neutral telemetry interchange schema** (adapter → engine) and the existing **§4 workload-model schema** (engine → renderer). Designing the engine and these two contracts is the subject of research spike [ISI-5634](/ISI/issues/ISI-5634).
+Two contracts make the layers independently buildable and the engine independently testable against recorded fixtures: the **neutral telemetry interchange schema** (adapter → engine) and the existing **§4 workload-model schema** (engine → renderer).
+
+**Design delivered by research spike [ISI-5634](/ISI/issues/ISI-5634)** (see [`docs/workload-model-engine-research.md`](workload-model-engine-research.md)); verdict: **build all three layers thin, reuse commodity execution engines**. No off-the-shelf tool converts *traces → chained scenarios + Little's-Law load + CoV-gated ramp + cache-avoidance datasets* backend- and tool-agnostically (closest prior art **WESSBAS** validates the "neutral model + per-tool transformer" pattern, not the feature set). Concrete decisions folded in here:
+
+- **Interchange contract** = `neutral-telemetry.schema.json` (draft v0.1, research §2.2): layered, OTLP-aligned, provenance-tagged (carries `meta.samplingRatio`/`coverageHint` for §11 R1; optional raw `traces[]` enables the §11 R5 cross-check). The adapter→engine boundary.
+- **Engine packaging** = **Python library-first with a thin CLI** (`build_model(interchange, *, now, seed) -> model`; `python3 -m workload_model.engine build interchange.json --now <ts> --seed 42`). **Pure function**: no network, no wall-clock (`generatedAt` injected), no unseeded RNG — this is what makes golden-fixture determinism possible. Network-MCP and WASM rejected for the engine (an MCP *wrapper* around the CLI is a cheap later add). A prototype already exists under `skills/workload-model/scripts/` (clustering/shaping/emit/G0 + 27 tests); the refactor is small — move dtctl/Grail knowledge **out** into the adapter, make the engine consume interchange.
+- **Renderer interface** (research §4.3): each renderer is a pure function over the approved model exposing `supports(model) -> {ok, unsupported[]}` **and** `render(model, opts) -> {files[], warnings[]}`. The **capability report** (`supports`) is the key agnostic affordance — e.g. the Locust renderer declares `arrivalProfile.model=open` needs a `LoadTestShape` approximation, so the agent can warn the human at VALIDATE **before** emitting misleading code. A tool registry keyed by name lets the user pick k6/JMeter/Locust/Gatling; the k6 renderer (`skills/k6-synthesis`) already matches this shape.
+- **§4 is ~90% renderer-complete** across all four tools; the six gaps are all additive/doc-only → scheduled as the **§4 v1.1** additive bump below.
 
 ---
 
@@ -557,6 +564,13 @@ Draft-07 JSON Schema, **v0.3**. Stored as `loadtests/<target>/workload-model.jso
 
 **Open schema questions (for Phase 3 / first real use):** multi-service journeys spanning Kafka topics; empirical think-time ergonomics; whether `caps` belongs in the model or only in `run-config.json` (current answer: model declares, run-config enforces).
 
+**§4 v1.1 — additive renderer-completeness bump** (scheduled from research spike [ISI-5634](/ISI/issues/ISI-5634) §4.2; all additive/optional, no structural change — keeps existing models valid):
+
+- **G-R1** (`steps[].request`, optional) — structured `{ method, pathTemplate, queryParams, headers, bodyPayloadRef }` so a generic renderer need not string-parse `steps[].operation` (`"POST /api/cart"`). k6-synthesis already parses the string; structuring de-risks the non-k6 renderers.
+- **G-P1** (`payloads[].fields[].target`, optional) — `{ into: body_field|query_param|path_param|header, as: <name> }` (mirrors `correlates.inject`), so a field's request-location is explicit rather than "assumed body".
+- **G-D1** (doc) — a ramping stage ramps *from the previous stage's end rate* (first ramping stage starts at 0); `stages[].rate` is iterations/s when `model=open`, VUs when `closed`; `shape` is authoritative for ramp_up/plateau/steady/ramp_down.
+- **Per-renderer capability notes** (not schema): `empirical` think-time and `body_html` extraction have no native construct in JMeter/Gatling/Locust (each documents its approximation — JSR223 timer / Boundary extractor / custom pause); open-arrival→Locust requires a `LoadTestShape`+pacing approximation; non-http `callType` (grpc/db/mq/cache) steps are topology/baseline only, not directly driven (driving them needs a per-renderer protocol plugin, out of thin-slice scope).
+
 ---
 
 ## 5. Artifact formats & repo layout
@@ -675,7 +689,12 @@ Invariant: **V1 approval hash-bound to model revision** is the anchor of the who
 
 Phase 3 decides build-skill vs use-MCP per row (e.g., Grafana Assistant / Speedscale / Tracetest as buy-side alternatives for rows 2–4).
 
-**Agnostic-engine refactor ([ISI-5622](/ISI/issues/ISI-5622), 2026-10-09 board direction — see §2.1).** Row 1 (SCOPE) separates into a **backend-specific input adapter** (the agent's dtctl/DQL + Istio-log pull, emitting the neutral telemetry interchange schema) and the **backend-agnostic workload-model engine** (§2.1 layer 2) that consumes it. Row 3 (SYNTHESIZE) becomes the **first of several tool-specific renderers** (k6 now; JMeter/Locust/Gatling behind the same interface). The engine and its two contracts are being designed under research spike **[ISI-5634](/ISI/issues/ISI-5634)**; the directly-affected Phase-3 skill issues ([ISI-5630](/ISI/issues/ISI-5630) SCOPE, [ISI-5631](/ISI/issues/ISI-5631) SYNTHESIZE) are re-scoped to this split and gated on that spike. Rows 4–5 ([ISI-5632](/ISI/issues/ISI-5632) EXECUTE, [ISI-5633](/ISI/issues/ISI-5633) ANALYZE) are unaffected — they consume `run-config.json` (§5.3) / the §4 model / `shape-diff.json` (§5.4), whose contracts the refactor does not change.
+**Agnostic-engine refactor ([ISI-5622](/ISI/issues/ISI-5622), 2026-10-09 board direction — see §2.1).** Row 1 (SCOPE) separates into a **backend-specific input adapter** (the agent's dtctl/DQL + Istio-log pull, emitting the neutral telemetry interchange schema) and the **backend-agnostic workload-model engine** (§2.1 layer 2) that consumes it. Row 3 (SYNTHESIZE) becomes the **first of several tool-specific renderers** (k6 now; JMeter/Locust/Gatling behind the same interface). The engine and its two contracts were designed under research spike **[ISI-5634](/ISI/issues/ISI-5634)** (delivered — `docs/workload-model-engine-research.md` + engine prototype `skills/workload-model/`). Resulting re-scope of the directly-affected Phase-3 skill issues:
+
+- **[ISI-5630](/ISI/issues/ISI-5630) (SCOPE)** → splits into a **`dtctl` input adapter** that runs the validated DQL pack and emits `neutral-telemetry.json` (reuses the ISI-5630 query pack, now *emitting interchange* instead of a model) **+ the engine refactor** (`build_model(interchange)`, moving Grail/dtctl knowledge out of the engine). Owner: Observability Agent.
+- **[ISI-5631](/ISI/issues/ISI-5631) (SYNTHESIZE)** → becomes the **k6 renderer behind the §4.3 renderer interface** (add `supports()`, formalize `render()`); other tools (JMeter/Locust/Gatling) are future renderers behind the same registry. Owner: Testing Architect.
+
+Rows 4–5 ([ISI-5632](/ISI/issues/ISI-5632) EXECUTE, [ISI-5633](/ISI/issues/ISI-5633) ANALYZE) are unaffected — they consume `run-config.json` (§5.3) / the §4 model / `shape-diff.json` (§5.4), whose contracts the refactor does not change. **Commodity execution engines are reused, not rebuilt** (`grafana/mcp-k6` for k6; native JMeter/Gatling/Locust binaries — per `docs/skills-mcp-decisions.md`). The **thin-slice PoC** (research §5.2) is the lowest-risk integration: `dtctl adapter → interchange.json → refactored engine → k6 renderer`, asserted **byte-identical to the committed golden** `loadtests/otel-astronomy-frontend/workload-model.json`.
 
 ---
 
@@ -713,6 +732,8 @@ Presentation storyline: *we already delegate execution credibly (evidence) → h
     - [ISI-5632](/ISI/issues/ISI-5632) EXECUTE → `loadtest-run` (scoped executor, caps/abort §7, G5 smoke + V2b-smoke gate, run-report) → Testing Architect;
     - [ISI-5633](/ISI/issues/ISI-5633) ANALYZE → `baseline-diff` (§3.5 shape-diff, synthetic filter, tolerance eval, iteration classifier, R5 infra cross-check) → Observability Agent.
     - §11 residuals are carried as explicit caveats inside the relevant child issues; R8/R9/R10 governance stays with BigBoss/Henrik.
+- **Agnostic-engine refinement** by BigBoss, 2026-10-09, per board comment on [ISI-5622](/ISI/issues/ISI-5622): Henrik asked to *"build a utility, agnostic of the observability backend AND the load-testing tool,"* fed by the agent and feeding per-tool renderers. Folded into the plan as the **§2.1 three-layer architecture** (input adapters → agnostic workload-model engine → tool renderers) + the §8 re-scope above; spawned research spike [ISI-5634](/ISI/issues/ISI-5634).
+- **Research spike [ISI-5634](/ISI/issues/ISI-5634) DELIVERED** (Research Engineer, 2026-10-09 — `docs/workload-model-engine-research.md`, 533 lines + working engine prototype `skills/workload-model/` with 27 tests). Verdict: **BUILD all three layers thin, REUSE commodity execution engines**; no off-the-shelf tool does trace→chained-scenario+Little's-Law+CoV-ramp+cache-dataset agnostically (WESSBAS validates the *pattern* only). Decisions folded into §2.1 + §4 v1.1: interchange = `neutral-telemetry.schema.json` (OTLP-aligned, provenance-tagged); engine = Python library + thin CLI, pure function (golden-fixture determinism); renderer interface with `supports()` capability report; §4 ~90% renderer-complete → 6 additive gaps scheduled as **§4 v1.1** (G-R1/G-P1/G-D1). Thin-slice PoC = dtctl-adapter→interchange→engine→k6 asserted byte-identical to the committed golden. Unblocks ISI-5622; re-scopes ISI-5630/5631 (§8).
 - Phase 3 ([ISI-4046](/ISI/issues/ISI-4046)) consumes §8; Phase 4 demo ([ISI-4047](/ISI/issues/ISI-4047)) executes §3 end-to-end on one target; Phase 5 deck ([ISI-4048](/ISI/issues/ISI-4048)) narrates §1–§2.
 
 ## 11. Known fidelity residuals (v0.3 watch-list)
