@@ -1,0 +1,42 @@
+{
+  "run": "2026-10-09T12-30-00Z",
+  "baselineTimeframe": "2026-10-01T00:00Z/2026-10-08T00:00Z",
+  "runTimeframe": "2026-10-09T12:10Z/2026-10-09T12:25Z",
+  "scalingFactor": 0.25,
+  "samplingFactor": { "prod": 1.0, "test": 1.0 },
+  "syntheticProbeCount": 1790,
+  "iterationIndex": 1,
+  "maxIterations": 3,
+  "requireR5": true,
+  "arrivalShape": {
+    "baselinePerMin": [400, 420, 440, 430, 410, 400],
+    "testPerMin":     [100, 105, 110, 108, 104, 101]
+  },
+  "latency": {
+    "browse_product": { "baseline": { "p50": 3.0, "p95": 36.0, "p99": 75.0 },
+                        "test":     { "p50": 3.1, "p95": 38.0, "p99": 80.0 } },
+    "checkout":       { "baseline": { "p50": 12.0, "p95": 120.0, "p99": 480.0 },
+                        "test":     { "p50": 20.0, "p95": 190.0, "p99": 900.0 } }
+  },
+  "serviceFanout": {
+    "baselineEdges": { "cart->get": 400, "productcatalog->get": 1200, "checkout->place": 60, "payment->charge": 60 },
+    "testEdges":     { "cart->get": 104, "productcatalog->get": 300, "checkout->place": 15, "payment->charge": 15 }
+  },
+  "errorRate": {
+    "browse_product": { "baseline": 0.004, "test": 0.006 },
+    "checkout":       { "baseline": 0.010, "test": 0.015 }
+  },
+  "journeyMix": {
+    "weights":  { "browse_product": 0.54, "cart": 0.28, "recommendations": 0.09, "checkout": 0.06, "home": 0.03 },
+    "observed": { "browse_product": 800, "cart": 120, "recommendations": 40, "checkout": 30, "home": 10 }
+  },
+  "r5CrossCheck": {
+    "available": true,
+    "metric": "dt.kubernetes.container.cpu_usage",
+    "source": "dynatrace-kubernetes-monitoring",
+    "workload": "frontend",
+    "idleBaseline": 0.018,
+    "duringRun": 0.19,
+    "telemetryClaimsLoad": true
+  }
+}
