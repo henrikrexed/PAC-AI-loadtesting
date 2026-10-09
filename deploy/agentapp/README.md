@@ -25,22 +25,26 @@ deterministically here.
 
 ---
 
-## Prerequisites (BLOCKER — needs secrets, not present in the ProxOps runner)
+## Prerequisites
 
-This runbook cannot complete from the current ProxOps runner. All three are owner-provided:
+1. **A valid kubeconfig** — ✅ **RESOLVED (ISI-5646)**. Regenerated via the CAPI path
+   (`clusterctl get kubeconfig memory-benchmark` against `capmox-mgmt-prod`; the old
+   `…/issues/b8031f35…/2026/07/28/…` copy was stale after a cert rotation). A **deploy-scoped**
+   ServiceAccount credential (`system:serviceaccount:agentapp:agentapp-deployer`) now lives on
+   the runner at **`~/.config/capmox/agentapp-deployer.kubeconfig`** (gitignored store, never
+   committed) — full admin *within* `agentapp`, namespace create/reconcile for `agentapp`, and
+   read of `otel-demo/dt-otlp-token` for §3. `kubectl auth can-i create deploy -n agentapp` → yes.
+   Point `KUBECONFIG` at that file (or the admin fallback `~/.config/capmox/memory-benchmark.kubeconfig`).
+2. **`DEEPSEEK_API_KEY`** — a DeepSeek API key (platform.deepseek.com). Owner-provided via Paperclip
+   `adapterConfig.secretEnv` on [ISI-5645](/ISI/issues/ISI-5645) (paid billing), never commit. **Still pending.**
+3. **DT oat05854 OTLP token** — *not a new secret*: the ISI-4089 `dt-otlp-token` is **currently
+   absent** from namespace `otel-demo` on this cluster, so §3's copy-across-namespace is a no-op —
+   mint it (see `secret.example.yaml`) or restore the ISI-4089 token. The deploy credential is
+   already pre-authorized to read it from `otel-demo` once present.
 
-1. **A valid kubeconfig** for the cluster that feeds oat05854 (the memory-benchmark cluster,
-   API `https://10.0.0.72:6443`). The API is reachable, but the only stored kubeconfig
-   (`…/issues/b8031f35…/2026/07/28/…-memory-benchmark.kubeconfig`) is **stale** — its CA and
-   client cert are both rejected (cert rotation since 2026-07-28). Refresh it.
-2. **`DEEPSEEK_API_KEY`** — a DeepSeek API key (platform.deepseek.com). Deliver via Paperclip
-   `adapterConfig.secretEnv`, never commit.
-3. **DT oat05854 OTLP token** — *not a new secret*: the ISI-4089 `dt-otlp-token` already exists
-   in the cluster (namespace `otel-demo`) and §3 copies it into `agentapp`. Only mint a new one
-   if that secret is gone.
-
-Container build also needs a registry the cluster can pull from (`REGISTRY` below). So the real
-owner-provided blockers reduce to **(1) a valid cluster kubeconfig** and **(2) a DeepSeek API key**.
+Container build also needs a registry the cluster can pull from (`REGISTRY` below). So the one
+remaining owner-provided blocker is **the DeepSeek API key** (ISI-5645); the kubeconfig is done
+and the DT token is an in-cluster mint.
 
 ---
 
