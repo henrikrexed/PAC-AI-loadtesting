@@ -531,3 +531,186 @@ items 2–3 above are the new determinism-specific additions this spike recommen
   dtctl/DQL + Istio logs can emit (esp. `busyTimeNano`, bucket interval, key cardinality).
 - **To Testing Architect (7ed0592a) — pull in, don't block:** validate §4.3 by stubbing one non-k6
   renderer and confirming G-R1/G-P1 are the only blocking §4 gaps.
+
+---
+
+## 8. Scenario reconstruction: ML evaluation (ISI-5635, 2026-10-09)
+
+**Spike question (Henrik, local-board 2026-10-09):** *does scenario-building need machine learning, or
+are the deterministic heuristics enough?* Evaluated honestly against the engine's non-negotiable —
+**determinism + golden-fixture testability** (its whole value prop). No production code; analysis +
+one empirical probe on the live oat05854 fixture.
+
+### 8.0 Recommendation (verdict first)
+
+**Keep the heuristic as v1 and the fallback; add ONE deterministic, ML-*adjacent* sequence miner
+(PrefixSpan) as the real fix behind the existing scenario-reconstruction interface; keep all
+*stochastic* ML strictly OUTSIDE the engine boundary as an offline, human-reviewed proposal assist.**
+
+The probe below (§8.1) changed the framing: the weakness is **not** "heuristics aren't accurate
+enough, so add ML." It is that the **structural feature we chose — the downstream service *set* — is
+the wrong signal**: on real traffic it is saturated by the shared ingress/frontend prefix and carries
+almost no discriminating power, so 100% of the real clustering work is done by a hand-coded,
+demo-specific op-name lookup table (`op_stem()`). That is the opposite of "learned from data," and it
+is exactly what will not generalize to a second application. The highest-leverage, determinism-safe
+fix is to **change the feature from a set to an ordered sequence** and mine it with a *deterministic*
+algorithm — not to bolt a trained model onto the engine. So: **hybrid, staged — ML (where it means
+sequence/behavior mining) proposes; heuristic + human dispose; the engine stays a pure function.**
+
+### 8.1 Where the heuristic is weak — grounded in a live probe
+
+`clustering.py` reduces journeys to scenarios by: (1) bucketing on an op-name **stem** (hand-coded
+string rules: `cart`/`checkout`/`browse`/`recommendations`/`home`, else first token), then (2) within
+a stem bucket, merging iff **Jaccard over the downstream service *set* ≥ 0.6** against the most-similar
+member; (3) high-reach journeys (reach ≥ 10, e.g. checkout) are isolated; (4) cap to ≤ 6 while
+coverage ≥ 0.80. It is **set-based and order-blind** by construction.
+
+**The probe (all 45 journey pairs in `fixtures/oat05854_extract.json`, live Jaccard):**
+
+- **The set signal is saturated — it barely discriminates.** Every journey shares the same 3-service
+  prefix (`frontend`, `load-generator`, `frontend-proxy`). With 4–5-service journeys that forces
+  **3 shared / 4–5 union = 0.60–0.75 automatically**, so **every single-page pair clears the 0.6 gate**
+  (23 of 45 pairs are ≥ 0.6; `browse_product` is ≥ 0.6 with 7 of its 9 peers). If you removed the
+  op-stem gate, Jaccard alone collapses the whole shop into ~1 scenario. **→ The Jaccard gate is
+  effectively a no-op for the common case; the taxonomy is produced entirely by the hand-coded stem
+  table.** That table is tuned to this one demo (it literally special-cases `ads`, `product_reviews`,
+  `ask_product` → "browse"); on any other app the rules miss and everything falls back to first-token
+  buckets — unpredictable collapse or explosion.
+- **Identical set, different load → silent over-merge (phantom).** `get_product_reviews` ×
+  `ask_product_ai_assistant` have **J = 1.000** (identical service set) and the stem table maps both to
+  "browse", so they merge — yet the AI-assistant path is a materially different, heavier operation
+  (route p50 30 ms + an LLM call vs 12 ms review read). The merged scenario drives a load shape neither
+  real flow has. Set + stem cannot see the difference; their **call sequences** can.
+- **Conditional branches average into a union no real trace exhibits.** Because `_absorb()` unions
+  service sets, a flow that branches (e.g. checkout that *sometimes* calls a fraud service) yields a
+  cluster `svc_set` that is the union of both branches — the synthesized journey fans out to services
+  that no single production trace touched together.
+- **No notion of a session.** Each root trace is an independent journey. Real users chain traces
+  (browse → browse → add → view cart → checkout) correlated by session id — the dominant *session*
+  shape is invisible. The schema carries `correlationKeys.sessionId`, but clustering never stitches it.
+  This is precisely the gap WESSBAS (§1.1) fills with Markov session models.
+- **Order and multiplicity are discarded.** "add 3 items then checkout" vs "checkout then add" hit the
+  same set → J = 1.0 → merged, despite different cache-key sequences and fan-out timing.
+- **Async fan-out is dropped.** The noise classifier removes Kafka consumers / background work; the
+  set-based synchronous tree never models producer→consumer causal edges.
+- **Rare critical, low-reach flows fall off the ≤6 cap.** The reach ≥ 10 rescue only saves fan-out-heavy
+  flows (checkout). A narrow but critical flow (login touching only `auth`: low reach, low weight) is
+  silently dropped by `enforce_cap` even though it gates everything.
+- **Threshold-cliff instability across windows.** A single hard 0.6 cut means near-boundary journeys
+  flip cluster membership on tiny window-to-window traffic changes; determinism *within* a window is
+  fine, but the scenario set is not *stable across re-extractions*.
+
+**Honest scope note:** the oat05854 fixture is a *synthetic load-generator* workload (every root span is
+pre-labeled `user_*` and single-shot) — the **easy** case, and the heuristic reproduces its golden
+correctly. The weaknesses above bite on **real production traffic** (unlabeled root spans = raw routes;
+multi-trace sessions; app-specific op names not in the table). A second, harder fixture is required to
+regression-test any successor; recommend adding a **session-correlated** extract (group oat05854 root
+traces by `session.id` over the same window — exposes the session gap using data we already hold) and,
+as a public stress set, a **DeathStarBench social-network** or **Alibaba cluster-trace** sample (deep
+branching + async fan-out). This is a follow-up fixture task, not done in this spike.
+
+### 8.2 Candidate approaches and fit
+
+| Approach | Input needed | Output shape | Beats heuristic on §8.1? | Deterministic + offline + golden-testable? |
+|---|---|---|---|---|
+| **(a) Sequence mining — PrefixSpan / SPADE** | per-session **ordered** call/route chains (needs session stitch) | frequent request subsequences + support → journey templates | **Yes** — order, multiplicity, phantom-branch, reviews-vs-AI, session chains | **Yes, fully.** Algorithmic frequent-pattern mining; given fixed input order + support threshold, output is a pure function. "ML-adjacent," not stochastic. **In-engine OK.** |
+| **(b) Markov / behavior model — WESSBAS-style** | session-stitched state transitions | transition matrix + think-time → session behavior model | **Yes** for session modeling (the #1 gap); partial on branch discovery | **Fit = deterministic** (transition counting is closed-form MLE, no training loop). **Sampling is stochastic.** OK in-engine *only as a frozen descriptor* (read dominant paths), never sampled at inference. |
+| **(c) Sequence-embedding clustering — trace2vec + k-means** | embedded trace sequences | dense vectors → k clusters | Sometimes — captures fuzzy similarity set+stem miss | **No (as-trained).** Random init + SGD + drift. Pure-function *only* if shipped as a **frozen, pre-trained** embedder + seeded k-means + fixed centroids — a heavy runtime (torch) dependency that fights "offline/no heavy deps." **Outside the engine.** |
+| **(d) Process mining — inductive miner / HMM** | event log (session-grouped events) | process tree / Petri net (explicit choice, loop, concurrency) | **Yes** — models branching & concurrency explicitly, the union-phantom killer | **Inductive miner = deterministic** (algorithmic, no training) → in-engine candidate. **HMM (Baum-Welch/EM) = stochastic** → outside / frozen only. |
+
+**Reading of the table:** the two determinism-safe, in-engine-eligible members are **(a) PrefixSpan**
+and **(d) the inductive miner** — both are *algorithms*, not trained models. The two that must stay
+outside are the *trainable* ones — **(c) embeddings** and **(d-HMM)**. **(b) Markov** sits on the
+fence: deterministic to fit, stochastic to sample, so usable in-engine only as a read-only descriptor.
+Crucially, **all four operate on sequences/event-logs, not service sets** — confirming §8.1's core
+finding that the fix is the *feature*, not the model class.
+
+### 8.3 The determinism tension — per-candidate verdict
+
+The engine's contract (§3.2, §6): `build_model(interchange, *, now, seed) → model`, pure, no network,
+no wall-clock, no unseeded RNG, byte-identical twice, order-invariant, golden-tested. Against that bar:
+
+- **(a) PrefixSpan — PASSES, in-engine.** Deterministic given a total input order (we already mandate
+  stable tie-breakers, §6.3) and a fixed `minSupport`. No RNG, no network, no model file. Golden test =
+  same sessions → same frequent patterns → same scenarios. **This is the recommended successor signal.**
+- **(d-inductive-miner) — PASSES, in-engine (stretch).** Deterministic algorithm; output process tree
+  is a pure function of the event log. Heavier to implement and to golden-diff than PrefixSpan; park as
+  a later add if branch/concurrency discovery proves necessary.
+- **(b) Markov/WESSBAS — CONDITIONAL.** May live in-engine **only** as a *frozen, read-only* transition
+  descriptor computed deterministically from the interchange (dominant-path extraction), never sampled
+  at inference. If we ever want to *generate* sessions by sampling the chain, that sampling must be
+  seeded and is better done in the renderer, not the engine.
+- **(c) embeddings + (d-HMM) — FAIL in-engine.** Trainable, stochastic, drift-prone, heavy runtime.
+  These **must live outside the engine boundary** as an *offline, human-reviewed scenario-proposal
+  assist*: they run once offline, a human approves/edits the proposed journey groupings at the mandatory
+  **VALIDATE gate**, and the approved grouping is frozen into a versioned fixture (shape: the existing
+  `confirmed_groups` / stem-override map that `cluster()` already accepts) that is fed **into** the pure
+  engine. **ML proposes; human disposes; the engine stays deterministic.** No trained model, no torch,
+  no drift ever crosses the engine boundary.
+
+### 8.4 Recommendation (slotted behind the existing scenario-reconstruction interface)
+
+`cluster()` already has the right seam: it accepts `stem_fn` and `confirmed_groups`, i.e. the
+scenario-reconstruction *strategy* is already injectable. Formalize that into a
+`ScenarioReconstructor` strategy interface and ship **two implementations**:
+
+1. **`HeuristicReconstructor` (v1, keep).** Today's set+stem+Jaccard. Remains the default and the
+   zero-dependency fallback. **One immediate de-risk, cheap:** lift the hand-coded `op_stem()` rules
+   into a **data-driven / config-supplied** stem map (the real fragility is the baked-in demo table,
+   not the Jaccard math) so a new app supplies its grouping without editing engine code.
+2. **`SequenceReconstructor` (v2, recommended build — ISI-5631 scope).** Session-stitch root traces by
+   `correlationKeys.sessionId` (fallback: time-gap sessionization per client), then **PrefixSpan** over
+   the ordered route chains to discover frequent journey templates. Deterministic, seedable, offline,
+   golden-testable. Directly fixes the two biggest §8.1 weaknesses (order-blindness, no-session) and
+   **removes the dependence on the hand-coded stem table** because grouping is learned from the actual
+   call sequences. Keep the §6 determinism tests (byte-identical twice, order-invariance) as the gate.
+
+**Outside the engine (optional, later):** an offline `ScenarioProposalAssist` (embeddings/HMM/Markov)
+that emits *candidate* groupings for a human to approve at VALIDATE; its blessed output is frozen into
+the config map consumed by `HeuristicReconstructor`/`SequenceReconstructor`. This is where genuinely
+*trained* ML is allowed to help, without ever compromising engine purity.
+
+**"Not now" for stochastic in-engine ML — explicit trigger to revisit:** only if, after shipping the
+deterministic sequence miner, we onboard apps where even ordered-sequence mining under-discriminates
+(e.g. very high-cardinality micro-operations or heavy semantic aliasing) **and** we can ship a
+**frozen, seeded, CPU-only** model as a versioned fixture with a passing golden test. Until both hold,
+no trainable model goes inside the engine.
+
+**Determinism verdict, one line per candidate:** PrefixSpan ✅ in-engine · inductive miner ✅ in-engine
+(stretch) · Markov ⚠️ in-engine only as frozen read-only descriptor · trace2vec embeddings ❌
+engine, ✅ offline-assist · HMM ❌ engine, ✅ offline-assist.
+
+---
+
+## 9. k6-MCP capability note (ISI-5635 Q2)
+
+Henrik suspected `grafana/mcp-k6` is launch-only. **Confirmed from the tool's actual surface** (repo
+README, `github.com/grafana/mcp-k6`, fetched 2026-10-09): it is *not* strictly launch-only — it exposes
+a validate tool, a run tool, docs browsing, **and** a script-generation *prompt* — but the generation
+surface is an **LLM-authoring prompt, not a deterministic tool**, which is exactly why it cannot be our
+generator. Classification:
+
+| MCP surface | Kind | generate / validate / launch / docs | Usable by our engine? |
+|---|---|---|---|
+| `validate_script` | tool | **validate** — runs the script at 1 VU / 1 iteration, reports errors | Optional dev-loop smoke only (equivalent to `k6 --dry-run` on the binary) |
+| `run_script` | tool | **launch** — executes a test with VUs/duration/stages, extracts metrics | Optional local dev inner-loop; **not** the scoped/delegated in-cluster run path |
+| `list_sections` | tool | **docs** — hierarchical, depth-limited k6 docs navigation | Author-time convenience only |
+| `get_documentation` | tool | **docs** — fetch full markdown for a doc slug | Author-time convenience only |
+| `generate_script` | **prompt resource** (not a tool) | **generate** — AI-powered NL→k6 workflow (research → best-practices → validate → test) | **No.** It is an LLM-authoring *prompt*, inherently non-deterministic and non-golden-testable. |
+
+**Conclusion (feeds the already-made plan decision):** Henrik's instinct is right in the way that
+matters. `generate_script` exists, but it is a **stochastic LLM prompt**, so it **cannot** satisfy the
+engine's determinism + golden non-negotiable — **we own generation regardless**, via our deterministic
+renderer (`skills/k6-synthesis`). `grafana/mcp-k6` is therefore at most an **optional dev-loop
+convenience**: `validate_script` / `run_script` for an ad-hoc smoke, docs browsing for authoring. It is
+**not a dependency** of generation or of the scoped execution path (the k6 **binary** in the benchmark
+harness is the engine). This confirms — with the tool surface as evidence — the `docs/skills-mcp-decisions.md`
+rows (b) k6-synthesis and (c) loadtest-run, and resolves the open "launch-only vs more?" question left
+there and in ISI-5622. **This is a note, not a build.**
+
+---
+
+*§8–§9 appended by Research Engineer for ISI-5635 (ISI-5622 research spike), 2026-10-09. Hand back to
+BigBoss to fold §8.4 into `docs/methodology.md` §2.1/§3.1 (scenario-reconstruction strategy interface +
+the data-driven stem-map de-risk) and to re-issue the Gate-V1 confirmation on ISI-5622. §8.4's
+`SequenceReconstructor` is proposed ISI-5631 scope; the harder second fixture (§8.1) is a follow-up.*
