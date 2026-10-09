@@ -653,5 +653,19 @@ Presentation storyline: *we already delegate execution credibly (evidence) → h
   - **G5** — small confirmation test (§3.4.1): first-class pre-full-run smoke run with 6 pass criteria incl. `synthetic==true` span presence; V2b-smoke gate added.
   - Schema delta: `correlates` on steps, `cacheProfile` on `payloadSpec`, `shape` on `arrivalProfile.stages`.
   - 4 open questions for Henrik in `docs/phase-g1g3-observability-extraction.md` §Open questions: front-end semantics in prod vs non-prod windows, ramp demo approach, Jaccard threshold tuning, think-time distribution default.
+  - **4 unclosed fidelity residuals carried as explicit caveats in §11** (R1/R2/R5/R8–R10) — per the [synthesis reconciliation §6.3](/ISI/issues/ISI-5628#document-synthesis); must not be dropped amid the G1–G5 gap-closures.
   - **Pending Gate-V1-style board validation of v0.3** — awaiting Henrik's confirmation.
 - Phase 3 ([ISI-4046](/ISI/issues/ISI-4046)) consumes §8; Phase 4 demo ([ISI-4047](/ISI/issues/ISI-4047)) executes §3 end-to-end on one target; Phase 5 deck ([ISI-4048](/ISI/issues/ISI-4048)) narrates §1–§2.
+
+## 11. Known fidelity residuals (v0.3 watch-list)
+
+The brainstorm ([ISI-5622](/ISI/issues/ISI-5622)) closed G1–G5, but four fidelity risks survived **unclosed** and are carried here as explicit caveats, not assumed resolved. Source: [synthesis note §6.3](/ISI/issues/ISI-5628#document-synthesis).
+
+**One-line reality test:** the four specialist threads hardened the *front-end anchor* (G1), *correlation* (G2), *cache-ratio* (G4), and *synthetic-tag* (G5) legs. The *peak-vs-mean*, *rare/error-journey*, and *instrumentation-coverage* legs are still on faith. **v0.3 reflects reality only while the residuals below are treated as open.**
+
+| ID | Residual | Why it still bites | Carry-forward action |
+|---|---|---|---|
+| **R2** | mean ≠ peak | SCOPE models mean arrival; no peak-envelope profile or "peak vs typical" variant exists at VALIDATE. The flat T0 tenant (CoV 0.10) hides this — mean ≈ peak is tenant luck. A non-trivial ramp can't even be *demonstrated* on T0. | Backlog a peak-envelope arrival profile + a VALIDATE "peak vs typical" choice; Phase-4 ramp demo needs a diurnal window or a deliberately-ramped locust profile. |
+| **R1** | extraction-side sampling blindness | §3.5 corrects the *diff* side, but rare/error journeys (tail-sampled-away checkouts, retry storms) are under-represented at *extraction*. | SCOPE must record the source sampling ratio and flag low-confidence / under-sampled journeys in `scenario-proposal.md` §Risks. |
+| **R5** | observability as circular ground truth | We extract *and* validate from the same telemetry; shared blind spots (async fan-out, websockets, fire-and-forget) are invisible on both sides. | Add an instrumentation-coverage caveat to every scenario proposal; cross-check at least one run against infra metrics (CPU/conns), not telemetry alone. |
+| **R8/R9/R10** | governance | Overfitting to V3 tolerances, autonomy eroding the V1 human gate, and non-stationarity between extract-time and run-time are methodology-governance calls, out of the technical siblings' scope by design. | Owner: BigBoss / Henrik. Revisit at the v0.3 Gate-V1 board validation. |
