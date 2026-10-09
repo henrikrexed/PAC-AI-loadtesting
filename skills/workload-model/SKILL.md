@@ -40,9 +40,18 @@ deterministic path. **dtctl carries SCOPE; the skill owns the query pack, algori
      chaining; front-end resolved at `istio-ingressgateway`; fuse on `trace.id`≈`x-request-id`.
      **If access logs are absent, record the spans-only caveat** (G0 criterion 11) and recover
      the HTTP surface from server-span `span.name` routes instead.
-3. **Cluster to 1-6 scenarios (G1)** — `scripts/clustering.py`: merge iff Jaccard(svcSet)≥0.6
-   **and** op-name stem agrees; high-reach journeys (reach≥10, e.g. checkout) never merge;
-   keep cumulative coverage ≥0.80.
+3. **Build behavioral journeys (G1), then cap to 1-6.** A journey is a multi-step *user flow*,
+   not a single span. Two stages:
+   - **Behavioral archetypes (`scripts/archetypes.py`) — primary grouping.** Split entry flows
+     by **business outcome**: does the flow place an order (reach an order-terminal service —
+     `payment`/`checkout`/`charge`/`order`, matched structurally, not tenant-hardcoded)? This
+     yields a **Buyer** archetype (browse → add-to-cart → checkout → pay → ship) and a
+     **Browser** archetype (search/browse, no order). Each journey's `steps[]` is the ordered
+     sequence **reconstructed from the trace span-tree** (`collectArray` over `sort start_time
+     asc`), so steps are a real flow with G2 `correlates` chaining — not a bag of spans.
+   - **Jaccard sub-split (`scripts/clustering.py`) — secondary.** If one archetype still fans
+     into structurally distinct flows, sub-split by Jaccard(svcSet)≥0.6 **and** op-name stem;
+     high-reach flows (reach≥10) never merge; keep cumulative coverage ≥0.80 and ≤6 journeys.
 4. **Code-link** each journey step (`codeRef = path#symbol`); flag `unlinked: true` otherwise.
 5. **Derive load + ramp (G3)** — `scripts/shaping.py`: pace (count/window, sampling-corrected),
    Little's Law concurrency **from the server span, never the load-driver wrapper**, CoV-gated
@@ -145,7 +154,8 @@ optional additive fields (draft-07, no `additionalProperties:false`): `source.ev
 ## Files
 
 - `scripts/schema.json` — §4 workload-model JSON schema (+ additive v0.4 tags)
-- `scripts/clustering.py` — G1 Jaccard + stem clustering to ≤6 scenarios
+- `scripts/archetypes.py` — G1 behavioral-journey archetypes (Buyer/Browser by business outcome)
+- `scripts/clustering.py` — G1 Jaccard + stem sub-clustering / ≤6 cap
 - `scripts/shaping.py` — G3 pace / Little's Law / CoV ramp shaping
 - `scripts/emit.py` — model assembly + §5.2 proposal rendering + canonical hash
 - `scripts/g0_gate.py` — G0 self-validation (schema + 12 exit criteria)

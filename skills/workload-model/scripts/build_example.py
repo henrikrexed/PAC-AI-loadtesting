@@ -1,12 +1,16 @@
 """End-to-end reference driver: oat05854 frontend -> workload-model.json + proposal, G0-gated.
 
-This is the skill's worked example. It takes the live extraction fixture
-(`fixtures/oat05854_extract.json` — every number captured from a real dtctl DQL run),
-runs the deterministic SCOPE algorithms (clustering -> shaping -> emit), self-validates
-with the G0 gate, and writes the artifacts to `loadtests/otel-astronomy-frontend/`.
+The skill's worked example. Takes the live extraction fixture (`fixtures/oat05854_extract.json`
+— every number captured from a real dtctl DQL run, incl. the trace-tree-reconstructed step
+sequences), runs the deterministic SCOPE pipeline, self-validates with G0, and writes the
+artifacts to `loadtests/otel-astronomy-frontend/`.
 
-Run:  python scripts/build_example.py
-Exit 0 iff G0 passes. The emitted files are the acceptance evidence for ISI-5630.
+Journeys are **behavioral archetypes** (Buyer / Browser) reconstructed from the trace span-tree,
+not endpoint clusters — each journey is a real multi-step flow with its ordered steps and (for
+the Buyer funnel) the G2 correlates chain. See archetypes.py for the rationale (board feedback,
+2026-10-09).
+
+Run:  python3 build_example.py   (exit 0 iff G0 passes)
 """
 
 from __future__ import annotations
@@ -16,11 +20,12 @@ from pathlib import Path
 
 import clustering as cl
 import shaping as sh
+from archetypes import to_archetypes, coverage as arch_coverage
 from emit import build_model, render_proposal
 from g0_gate import evaluate_g0
 
 HERE = Path(__file__).resolve().parent
-ROOT = HERE.parent.parent.parent  # repo root
+ROOT = HERE.parent.parent.parent
 FIXTURE = HERE.parent / "fixtures" / "oat05854_extract.json"
 OUT_DIR = ROOT / "loadtests" / "otel-astronomy-frontend"
 GENERATED_AT = "2026-10-09T00:00:00Z"
@@ -28,79 +33,55 @@ GENERATED_AT = "2026-10-09T00:00:00Z"
 QUERIES = [
     "fetch spans | filter request.is_root_span==true | sort start_time asc | summarize takeFirst(service.name),takeFirst(span.name) by trace.id | summarize count() by entryService,entryOp  (G1-C front-end discovery)",
     "fetch logs | filter k8s.container.name=='istio-proxy' | summarize count()  (access-log availability probe -> 0)",
-    "fetch spans | filter is_root_span && service.name=='load-generator' && startsWith(span.name,'user_') | summarize count() by entryOp  (G3-A pace)",
-    "fetch spans ... join collectDistinct(service.name) by trace.id ... summarize avg(nsvc),takeAny(services) by entryOp  (G1-E reach/svcSet)",
+    "fetch spans | filter is_root_span && service.name=='load-generator' && startsWith(span.name,'user_') | summarize count() by entryOp  (G3-A pace + order-split)",
+    "fetch spans ... join collectDistinct(service.name) by trace.id ... summarize takeAny(services) by entryOp  (G1-E svcSet -> order-terminal classification)",
     "fetch spans | filter span.kind=='server' && service.name=='frontend' | summarize percentile(duration,50/95/99),avg(duration) by span.name  (route baselines)",
-    "fetch spans | filter is_root_span && service.name=='load-generator' && startsWith(span.name,'user_') | summarize count() by bin(start_time,1m) | summarize avg,stddev  (G3-B CoV)",
+    "fetch spans | join [spans|sort start_time asc|summarize collectArray(concat(service.name,span.name)) by trace.id] on trace.id  (JOURNEY STEP RECONSTRUCTION from trace span-tree)",
+    "fetch spans | filter is_root_span && ... | summarize count() by bin(start_time,1m) | summarize avg,stddev  (G3-B CoV)",
     "fetch spans | filter span.kind=='server' && service.name=='frontend' | summarize sum(duration)/window  (observed concurrency)",
     "fetch spans | filter service.name=='product-catalog' && isNotNull(app.product.id) | summarize countDistinctExact(app.product.id),count()  (G4 cache keyCardinality)",
 ]
 
-# --- per-scenario representative route baseline (dominant member; p99 = cluster worst) ---
-# keyed by scenario name produced by clustering.SCENARIO_NAMES
-SCENARIO_BASELINE = {
-    "Browse product page": {"p50Ms": 2, "p95Ms": 16, "p99Ms": 46, "errorRate": 0.0},   # products dominant; p99 from ai-assistant
-    "Cart":                {"p50Ms": 3, "p95Ms": 5,  "p99Ms": 7,  "errorRate": 0.0},
-    "Recommendations":     {"p50Ms": 12, "p95Ms": 15, "p99Ms": 20, "errorRate": 0.0},
-    "Checkout":            {"p50Ms": 53188, "p95Ms": 106377, "p99Ms": 150441, "errorRate": 0.0},
-    "Home":                {"p50Ms": 4, "p95Ms": 5,  "p99Ms": 6,  "errorRate": 0.0},
-}
-
-SCENARIO_ENTRYPOINT = {
-    "Browse product page": "GET /api/products/[productId]/index",
-    "Cart": "POST /api/cart",
-    "Recommendations": "GET /api/recommendations",
-    "Checkout": "POST /api/checkout",
-    "Home": "GET /",
-}
-
-# codeRef against the upstream open-telemetry/opentelemetry-demo frontend (Next.js API routes).
-# NOT vendored in this repo — flagged in the proposal; paths are stable upstream.
-SCENARIO_CODEREF = {
-    "Browse product page": "src/frontend/pages/api/products/[productId].ts#handler",
-    "Cart": "src/frontend/pages/api/cart.ts#handler",
-    "Recommendations": "src/frontend/pages/api/recommendations.ts#handler",
-    "Checkout": "src/frontend/pages/api/checkout.ts#handler",
-    "Home": "src/frontend/pages/index.tsx#Home",
-}
+# Journey-level baseline = the defining step of the archetype (Buyer: the order-placing
+# checkout step, which carries the heavy tail driving abort thresholds; Browser: the slowest
+# read step). p50 from the entry step, p95/p99 from the defining step.
+BUYER_BASELINE = {"p50Ms": 2, "p95Ms": 106377, "p99Ms": 150441, "errorRate": 0.0}
+BROWSER_BASELINE = {"p50Ms": 2, "p95Ms": 39, "p99Ms": 46, "errorRate": 0.0}
 
 
 def main() -> int:
     fx = json.loads(FIXTURE.read_text())
 
-    # --- G1: cluster the extracted journeys to <=6 named scenarios ---
+    # --- G1: reconstruct behavioral archetypes (Buyer / Browser) from the trace span-tree ---
     journeys = [cl.Journey(op=j["op"], traces=j["traces"], svc_set=j["svc_set"]) for j in fx["journeys"]]
-    scenarios = cl.cluster(journeys)
-    scenarios, _ = cl.weight_scenarios(scenarios)
-    scenarios, dropped, coverage = cl.enforce_cap(scenarios)
+    archetypes = to_archetypes(
+        journeys,
+        buyer_steps=fx["buyer_steps"],
+        browser_steps=fx["browser_steps"],
+    )
+    cov = arch_coverage(archetypes)
 
-    # --- G3: arrival shaping from the per-minute curve (reconstruct from CoV summary) ---
-    cov = fx["per_minute_cov"]["cov"]
-    mean_rpm = fx["per_minute_cov"]["meanRpm"]
-    # steady here (cov < 0.15): emit the curve summary as a flat body; shape_ramp handles the tail.
-    synthetic_curve = [mean_rpm] * fx["per_minute_cov"]["bins"]
-    stages, _cov = sh.shape_ramp(synthetic_curve)
-    assert abs(_cov) < 1e-9 or cov < sh.COV_STEADY_MAX  # flat curve -> steady branch
+    # --- G3: arrival shaping from the per-minute curve (steady here; CoV < 0.15) ---
+    pm = fx["per_minute_cov"]
+    stages, _cov = sh.shape_ramp([pm["meanRpm"]] * pm["bins"])
 
-    # --- Little's Law (server span, not wrapper) ---
+    # --- Little's Law (server span, not the 15s driver wrapper) ---
     base = fx["server_baseline_frontend"]
     llc = sh.littles_law(fx["server_rate_tps"], base["mean_ms"], fx["observed_concurrency"])
 
-    # --- assemble journeys with baselines, codeRefs, evidence tags, and G2 correlates ---
+    # --- assemble 2 behavioral journeys, each a real multi-step flow ---
     model_journeys = []
-    for sc in scenarios:
-        jid = sc.name.lower().replace(" ", "-")
-        steps = _steps_for(sc)
+    for a in archetypes:
         model_journeys.append({
-            "id": jid,
-            "description": f"{sc.name} — merged from {', '.join(sc.members)} (reach {sc.reach:.0f})",
-            "weight": round(sc.weight, 4),
-            "entrypoint": SCENARIO_ENTRYPOINT.get(sc.name, sc.members[0]),
-            "codeRef": SCENARIO_CODEREF.get(sc.name),
+            "id": a.id,
+            "description": f"{a.name} — {'places an order' if a.places_order else 'read-only, no order'}; "
+                           f"reconstructed from the trace span-tree; folds entry ops: {', '.join(a.members)}",
+            "weight": round(a.weight, 4),
+            "entrypoint": a.steps[0]["operation"] if a.steps else a.members[0],
+            "codeRef": a.steps[0].get("codeRef") if a.steps else None,
             "evidenceSource": "span",
-            "spanless": False,
-            "steps": steps,
-            "baseline": SCENARIO_BASELINE[sc.name],
+            "steps": a.steps,
+            "baseline": BUYER_BASELINE if a.places_order else BROWSER_BASELINE,
         })
 
     payloads = _payloads(fx)
@@ -119,33 +100,33 @@ def main() -> int:
         sampling_ratio=fx["sampling_ratio"],
         arrival_model="open",
         stages=[vars(s) for s in stages],
-        littles_law=vars(llc) if hasattr(llc, "__dict__") else {
-            "expectedConcurrency": llc.expectedConcurrency,
-            "observedConcurrency": llc.observedConcurrency,
-            "ratio": llc.ratio,
-        },
+        littles_law=vars(llc),
         journeys=model_journeys,
         payloads=payloads,
         caps=caps,
-        coverage=coverage,
+        coverage=cov,
     )
 
     proposal = render_proposal(
         model,
-        exclusions="health/metrics scrapes, flagd polling, Kafka consumers (noise classifier); "
-                   "non-application roots",
+        exclusions="health/metrics scrapes, flagd polling, Kafka consumers (noise classifier)",
         target_env="staging / non-production allowlist (production forbidden without board approval)",
-        abort_note="Abort thresholds set ABOVE the observed tail: checkout `POST /api/checkout` "
-                   "p99 = 150441 ms is real steady-state latency — set p95 abort > 110000 ms and "
-                   "errorRate abort at 5% so the heavy tail does not self-abort the run.",
+        abort_note="Abort thresholds set ABOVE the Buyer tail: `POST /api/checkout` p99 = 150441 ms "
+                   "is real order-placing latency — set p95 abort > 110000 ms, errorRate abort 5%.",
         risks_extra=[
-            "**Checkout heavy tail.** `POST /api/checkout` p50=53 s / p99=150 s on this tenant — "
-            "the dominant risk path. Kept as its own unmerged scenario (reach 12) despite 6.6% "
-            "weight. Verify this tail is expected before treating a test p99 regression as a fault.",
-            "**Front-end choice.** The synthetic `load-generator` driver was preferred over the "
-            "edge server `frontend-proxy` for this non-prod window (richer journey names). A "
-            "production-faithful model would resolve to `frontend-proxy`/`ingress` — confirm the "
-            "intended choice at VALIDATE.",
+            "**Journeys are behavioral archetypes, not endpoints.** Steps were reconstructed from "
+            "the trace span-tree (`collectArray` over `sort start_time asc`). The Buyer funnel's "
+            "downstream fan-out (PlaceOrder → GetCart → GetProduct×N → Convert×N → shipping quote "
+            "→ payment Charge → ship-order → EmptyCart → email) is captured as the checkout step's "
+            "reach-12 signature; the driver replays the 4 user-facing HTTP steps and the backend "
+            "funnel follows.",
+            "**R5 / session-chaining limit.** The locust driver carries no persistent session id on "
+            "browse spans (`app.user.id` appears only on cart/checkout), so browse→buy cannot be "
+            "chained across independent tasks. The Buyer archetype is therefore reconstructed from "
+            "the self-contained checkout_* traces (which internally browse→cart→checkout). A real "
+            "production front-end with a `session.id` cookie would let SCOPE chain full sessions.",
+            "**Weights are per-outcome.** Buyer ≈6.1%, Browser ≈93.9% of entry traffic (share of "
+            "flows that place an order vs not), summed from the order-split query.",
         ],
     )
 
@@ -155,36 +136,9 @@ def main() -> int:
 
     g = evaluate_g0(model, dql_run_live=True, proposal_text=proposal)
     print(json.dumps(g.to_dict(), indent=2))
-    print(f"\nscenarios: {[s.name for s in scenarios]}  coverage={coverage:.3f}  dropped={[d.name for d in dropped]}")
+    print(f"\narchetypes: {[(a.id, round(a.weight, 3), len(a.steps)) for a in archetypes]}  coverage={cov:.3f}")
     print(f"wrote {OUT_DIR}/workload-model.json  and  scenario-proposal.md")
     return 0 if g.passed else 1
-
-
-def _steps_for(sc: cl.Scenario) -> list[dict]:
-    """Downstream steps for a scenario. Checkout carries a real G2 correlates chain."""
-    if sc.name == "Checkout":
-        return [
-            {"id": "s1", "service": "frontend", "operation": "POST /api/cart",
-             "callType": "http", "codeRef": "src/frontend/pages/api/cart.ts#handler",
-             "evidenceSource": "span"},
-            {"id": "s2", "service": "frontend", "operation": "POST /api/checkout",
-             "callType": "http", "codeRef": "src/frontend/pages/api/checkout.ts#handler",
-             "evidenceSource": "span", "payloadRef": "checkout",
-             "dependsOn": ["s1"],
-             "correlates": [{
-                 "sourceStepId": "s1",
-                 "extract": {"from": "header", "path": "set-cookie:session"},
-                 "inject": {"into": "header", "as": "cookie"},
-             }]},
-        ]
-    # non-chained scenarios: single entry step, no dependsOn (-> no correlates required)
-    return [{
-        "id": "s1", "service": "frontend",
-        "operation": SCENARIO_ENTRYPOINT.get(sc.name, sc.members[0]),
-        "callType": "http", "codeRef": SCENARIO_CODEREF.get(sc.name),
-        "evidenceSource": "span",
-        **({"payloadRef": "product"} if sc.name == "Browse product page" else {}),
-    }]
 
 
 def _payloads(fx: dict) -> dict:

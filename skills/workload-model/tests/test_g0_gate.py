@@ -61,7 +61,7 @@ def test_unavailable_with_caveat_passes():
 def test_blocks_on_too_many_journeys():
     m = copy.deepcopy(_model())
     extra = copy.deepcopy(m["spec"]["journeys"][0])
-    m["spec"]["journeys"].extend([{**extra, "id": f"extra-{i}"} for i in range(3)])  # -> 8
+    m["spec"]["journeys"].extend([{**extra, "id": f"extra-{i}"} for i in range(6)])  # -> 8 > 6
     g = g0.evaluate_g0(m, dql_run_live=True, proposal_text=_proposal())
     assert any(c.id == "journey-count" and not c.passed for c in g.checks)
     assert not g.passed
@@ -76,7 +76,7 @@ def test_blocks_on_littles_law_out_of_band():
 
 def test_blocks_on_dependson_without_correlates():
     m = copy.deepcopy(_model())
-    co = next(j for j in m["spec"]["journeys"] if j["id"] == "checkout")
+    co = next(j for j in m["spec"]["journeys"] if j["id"] == "buyer")
     for st in co["steps"]:
         st.pop("correlates", None)  # leave dependsOn dangling
     g = g0.evaluate_g0(m, dql_run_live=True, proposal_text=_proposal())
