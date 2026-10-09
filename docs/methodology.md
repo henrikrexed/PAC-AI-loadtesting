@@ -3,7 +3,7 @@
 *ISI-4045 · Phase 2 of the PAC "Loadtesting & AI" track ([ISI-4032](/ISI/issues/ISI-4032), plan rev 1, approved 2026-09-08)*
 *Builds on: [`research/loadtesting-from-observability.md`](../research/loadtesting-from-observability.md)*
 
-**Version:** 0.2 (draft, O11y-reviewed) · **Status:** awaiting board validation (Gate V1) on this document itself — we apply the methodology to its own delivery: nothing is "final" until a human validates it.
+**Version:** 0.3 (draft, all-gaps-closed) · **Status:** awaiting board validation (Gate V1) on this document itself — we apply the methodology to its own delivery: nothing is "final" until a human validates it.
 
 ---
 
@@ -62,37 +62,84 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 **Objective:** derive a workload model (arrival profile + weighted journeys + payload specs) from a production telemetry timeframe, linked to code.
 
 **Inputs:**
-- target service name and Dynatrace environment (dtctl profile)
+- Dynatrace environment (dtctl profile) — **the target service is NOT assumed up front; SCOPE discovers it** (see step 2a)
 - analysis timeframe (default: last 7 days, peak-inclusive; MUST exclude deploy windows and incidents)
 - repo/commit of the service code (for journey→code linking)
 
 **Procedure:**
 1. **Timeframe sanity** — confirm the window is deploy-free and incident-free (DQL on deployment events / problem records). If not, shrink or shift and record why in the proposal.
-2. **Baseline extraction** (DQL via dtctl; representative query pack):
-   - Top entry operations by volume:
+2. **Baseline extraction** (DQL via dtctl; validated query pack — see `docs/phase4-t0-dql-validated.md` and `docs/phase-g1g3-observability-extraction.md` for live-validated field names):
+
+   **2a. Front-end discovery (G1 — new).** The agent identifies the service that originates application traffic from the span graph — it is not told the front-end in advance.
+
+   - **Step 1 — attribute each trace to its earliest-starting root span** (not raw root-span count, which is unreliable under trace fragmentation — a single `trace.id` can carry many `is_root_span==true` spans):
      ```sql
-     fetch spans
-     | filter isEntrySpan() and service.name == $service
-     | summarize calls = count(), by: { service.name, span.name }
+     -- G1-C: entry point = earliest-start root span per trace
+     fetch spans, from: -2h
+     | filter request.is_root_span == true
+     | sort start_time asc
+     | summarize entryService = takeFirst(service.name),
+                 entryOp      = takeFirst(span.name),
+       by: { trace.id }
+     | summarize traces = count(), by: { entryService, entryOp }
+     | sort traces desc
+     ```
+     *Note: use `request.is_root_span == true` (validated); `isEntrySpan()` is illustrative only and must be confirmed against the target tenant. `start_time`/`end_time` are the usable timestamps; `timestamp` is typically empty on spans.*
+
+   - **Step 2 — apply noise classifier.** From the ranked `(entryService, entryOp)` list, drop:
+     - operational endpoints: `GET /health`, `/healthz`, `/livez`, `/readyz`, `GET /metrics`
+     - infra polling: `flagd *.Service/*`, config/stream endpoints
+     - async consumers: `span.kind == "consumer"` (Kafka `receive`, order events, etc.)
+
+   - **Step 3 — tiebreak between load driver and edge server.** If a synthetic load driver is present (op names like `user_*`), **prefer it only in non-production analysis windows** (driver names are human-legible journeys). For any window modelling production traffic, fall through to the edge server (`span.kind == "server"`, names like `*-proxy`, `*gateway`, `ingress`). Confirm with downstream service-graph reach via a `join` query.
+
+   - **Baseline extraction (entry operations by volume):**
+     ```sql
+     -- validated equivalent of the former isEntrySpan() query
+     fetch spans, from: -7d
+     | filter request.is_root_span == true and service.name == $entryService
+     | summarize calls = count(), by: { span.name }
      | sort calls desc | limit 25
      ```
-   - Arrival curve (per-minute request rate at entry):
+
+   - Arrival curve (per-minute request rate at entry — also used for ramp extraction in step 5):
      ```sql
-     fetch spans
-     | filter isEntrySpan() and service.name == $service
+     fetch spans, from: -7d
+     | filter request.is_root_span == true and service.name == $entryService
      | makeTimeseries count(), interval: 1m
      ```
-   - Latency and error baseline per entry operation:
+     *Grail caveat: `makeTimeseries`/`bin` snaps the interval upward over long windows (~1000-bucket cap). Read the returned interval; do not assume the requested granularity.*
+
+   - Latency and error baseline per entry operation (**use the server-side span, not the load-driver wrapper** — the wrapper bakes in client think-time, which inflates concurrency estimates ~1000×):
      ```sql
-     fetch spans
-     | filter isEntrySpan() and service.name == $service and span.name == $op
-     | summarize p50 = percentile(duration, 50), p95 = percentile(duration, 95),
-                 p99 = percentile(duration, 99), err = count(error)
+     fetch spans, from: -7d
+     | filter span.kind == "server" and service.name == $frontendServer and span.name == $op
+     | summarize p50 = percentile(duration, 50)/1000000.0,
+                 p95 = percentile(duration, 95)/1000000.0,
+                 p99 = percentile(duration, 99)/1000000.0,
+                 err = count(error)
      ```
+     Store p99 in the baseline (§4); it drives abort thresholds (§3.4). When server p99 is anomalously high (e.g. > 10 s), record it and set abort thresholds above that value rather than below.
+
    - Service-graph fan-out (downstream call edges and rates from traces).
-3. **Journey extraction** — group traces by entry span; normalize span trees (service, operation, call type, ordering); cluster identical/nearest signatures; keep journeys until cumulative volume ≥ **80%** of entry traffic (coverage rule). Record per-journey weight (share of traffic) and think-time distribution from inter-span gaps.
+
+3. **Journey extraction and scenario clustering to 1–6 named scenarios (G1 — new).**
+   - Rank filtered entry operations by volume. Accumulate until cumulative weight ≥ **80%** of application entry traffic (coverage rule). Record per-journey weight and think-time distribution from inter-span gaps.
+   - **Think-time per journey:** `think_time = load_driver_wrapper_duration − server_response_time`. This recovers the per-journey think-time distribution directly from telemetry for `spec.journeys[].steps[].thinkTime`.
+   - **Cap to ≤6 named scenarios.** Merge journeys that share a structural fan-out signature **and** a semantic op-name stem: merge if Jaccard(downstream-service-set_A, downstream-service-set_B) ≥ 0.6 **and** op-name stems agree (or the operator confirms). The merged cluster inherits the sum of its members' weights. Record each scenario's cumulative weight in `spec.journeys[].weight`. Keep cumulative coverage ≥ 0.80 after merging; if coverage would drop below, do not merge.
+   - If a tenant yields >6 clusters after merging, drop the lowest-weight tail clusters while cumulative weight stays ≥ 0.80, and record the dropped tail in the proposal.
+   - Scenarios with structurally unique fan-out (e.g. a full transactional checkout with reach >10 services) MUST NOT be merged even if weight is low, because they represent the highest-risk code paths.
+
 4. **Code linking** — for each journey step, locate the implementing code (route handler, client call, DB/mq statement) via code search; record `codeRef` (`path#symbol`). Journeys that cannot be linked are flagged `unlinked: true` and MUST be called out in the proposal.
-5. **Arrival model fit** — open model (arrival-rate) for public/queueing APIs; closed model (VU-bound) for seat-limited systems. Sanity-check with Little's Law: `concurrency ≈ arrival_rate × mean_response_time`; deviations > 2× flag a modeling error.
+
+5. **Arrival model fit, concurrency, and ramp shaping (G3 — new).**
+   - **Pace (TPS/TPM) per scenario:** entry-trace count ÷ window, summed over the cluster's member ops (query G3-A). Note whether the tenant reported `Sampled: no`; if sampling is active, apply a sampling-correction factor before the division.
+   - **Concurrency (Little's Law):** `concurrency ≈ arrival_rate × mean_server_response_time`. The response-time term MUST come from the **server-side entry span** (not the load-driver wrapper). Open model (arrival-rate executors) for public/queuing APIs; closed model (VU-based) for seat-limited systems: `VUs ≈ arrival_rate × (server_response_time + think_time)`. Deviations > 2× flag a modeling error.
+   - **Ramp-up / ramp-down shaping:** compute CoV = stddev ÷ mean of the per-minute arrival curve.
+     - **CoV < 0.15** → steady traffic: emit a single `constant-arrival-rate` stage with `shape: "steady"`.
+     - **CoV ≥ 0.15** → extract the ramp: identify the global-peak minute; the monotone-rising prefix = ramp-up, the monotone-falling suffix = ramp-down, the middle = plateau. Piecewise-linear-segment the curve to **≤6 `ramping-arrival-rate` stages** (per segment: `rate` = segment mean, `duration` = segment length). Record both ramp-up and ramp-down tails in `spec.arrivalProfile.stages`.
+   - The `arrivalProfile.littlesLawCheck` block MUST be populated with `expectedConcurrency`, `observedConcurrency`, and `ratio`.
+
 6. **Emit artifacts** — `workload-model.json` (schema §4) + `scenario-proposal.md` (template §5.2).
 
 **Outputs:** `workload-model.json`, `scenario-proposal.md`.
@@ -100,12 +147,16 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 **Exit criteria — Gate G0 (machine-checkable, enforced before VALIDATE is offered):**
 - [ ] `workload-model.json` validates against the schema in §4
 - [ ] cumulative journey weight ≥ 0.80 (coverage) — actual value recorded in `spec.coverage`
+- [ ] number of journeys ∈ [1, 6]
 - [ ] every journey has `codeRef` per step, or explicit `unlinked: true` with reason
-- [ ] every journey carries a `baseline` (p50/p95/p99/error-rate)
-- [ ] arrival profile passes the Little's-Law sanity check
+- [ ] every journey carries a `baseline` (p50/p95/p99/error-rate) sourced from the server-side span
+- [ ] arrival profile passes the Little's-Law sanity check (`ratio` ∈ [0.5, 2.0])
+- [ ] every `dependsOn` step edge has a `correlates` entry specifying the data-flow (source, extract, inject) — see §4
+- [ ] `spec.payloads` entries with `cacheProfile.targetHitRatio > 0` carry a `keyCardinality` calculation — see §4
 - [ ] proposal names target environment from the allowlist and the requested blast-radius caps
+- [ ] all DQL queries have been run live against the target tenant and field names confirmed
 
-**Skill boundary (Phase 3 input):** dtctl/DQL query pack + timeframe sanity; span-tree clustering; code-search linking; model emission + G0 self-validation.
+**Skill boundary (Phase 3 input):** dtctl/DQL query pack (G1-C, G3-A, G3-B, latency, fan-out) + timeframe sanity; front-end discovery + noise classifier; span-tree journey extraction + Jaccard clustering to ≤6 scenarios; think-time recovery; CoV-gated ramp extraction; code-search linking; model emission + G0 self-validation.
 
 ### 3.2 VALIDATE — mandatory human gate
 
@@ -126,39 +177,81 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 
 **Rules:**
 1. **k6 primary.** Gatling (Scala) / Locust (Python) only when `run-config.tool` explicitly selects them; the model is tool-agnostic, generators are per-tool.
-2. Structure per model: one k6 *scenario* per journey group using arrival-rate executors (`constant-arrival-rate` / `ramping-arrival-rate`) for open models, VU executors (`constant-vus`) for closed models; think times from the model distribution; per-scenario weights from journey weights.
-3. **Synthetic payloads** generated from `payloadSpec` distributions — never sampled from production data; no PII possible by construction; random seeds recorded in the run for determinism.
-4. LLM assistance is allowed for authoring, but output MUST pass static checks (Gate V2a) and, later, the shape-diff (Gate V3). A hallucinated endpoint/parameter fails V2a and is rejected.
-5. Test code carries the identity header by construction: `baggage: synthetic=true` on every request (k6 OTel extension / `k6/x/tracing`).
+2. **Executor mapping.** One k6 *scenario* per journey group. Executor choice per model:
+   - Open model: `constant-arrival-rate` (steady) or `ramping-arrival-rate` (piecewise stages from §3.1 ramp extraction). The `preAllocatedVUs` ceiling must accommodate the ramp peak.
+   - Closed model (VU-bound): `constant-vus` (steady) or `ramping-vus` with matching stage profile.
+   - **Ramp-down tail:** the final stage in a `ramping-arrival-rate` / `ramping-vus` config MUST reach `rate: 0` / `target: 0` over a realistic cool-down duration (default: same duration as the ramp-up). Do not end a ramping test at peak rate.
+   - Assert `dropped_iterations == 0` during steady stages; non-zero dropped iterations mean `preAllocatedVUs` is too low for the target rate.
+3. **Request chaining and correlation (G2 — new).** A journey is **one correlated session per VU-iteration**, not N independent requests.
+   - **Iteration = session.** Per-iteration local variables hold correlated state (session cookie, auth token, cart/order id). Never hold session state in module scope (cross-VU bleed).
+   - **Cookie isolation.** k6's cookie jar persists across iterations per VU by default. To model a fresh user per journey, reset it each iteration (`http.cookieJar().clear(url)` or a fresh `new http.CookieJar()`).
+   - **Correlation = extract → inject.** Each `dependsOn` edge in `spec.journeys[].steps[]` is a data-flow edge specified by the `correlates` field (see §4 schema). Implementation: extract from the prior response (JSON path, response header, HTML field via `findBetween`); inject into the next request (auth header, path parameter, request body).
+   - **Wrap each step in `group('stepId')`** so k6 metrics and OTel span names are per-step, feeding the §3.5 per-step latency shape-diff.
+   - **Fail the chain on broken correlation.** If an extract yields null (missing token, id, etc.), fail the iteration immediately (`fail()` / early return). A chain that continues with garbage data inflates downstream counts and corrupts the fan-out diff. This is the primary source of unrealistic chains and MUST be enforced.
+4. **Synthetic payloads and cache-avoidance dataset strategy (G4 — new).** Payloads are never sampled from production data; generators are PII-free by construction; random seeds recorded for determinism.
+   - **Goal: reproduce production's cache behaviour, not eliminate caching.** A test with all-unique keys overstates backend load; a test with a single key understates it. The payload pool MUST reproduce production's cache hit ratio (from telemetry) by matching the key-reuse (popularity) distribution and working-set size.
+   - **Sizing math.** Let `R` = target RPS, `D` = run duration (s), `T` = cache TTL (s), `m_prod` = production miss ratio for the endpoint.
+     - Minimum unique-key pool size to avoid forced all-hits inside one TTL: `K ≥ R × T × m_prod`.
+     - For a "no key reused in the same TTL window" guarantee: `K ≥ R × T`.
+     - For one-pass uniqueness across the full run: `K ≥ R × D`.
+     - Birthday-bound intuition: drawing `N` requests from `K` uniform keys yields ≈ `N²/(2K)` repeats — forced uniqueness is quadratically expensive and typically impractical for long runs.
+   - **Popularity distribution.** Fit the key-access distribution to production telemetry. The existing `payloadSpec.distribution` enum already includes `"zipf"` — use it with a fitted `α` parameter (from cache-hit-rate telemetry). Zipf ≈ 1 reproduces a typical web workload where ~0.6% of keys yield >80% hit ratio.
+   - **Seeded backing store.** The target's database/store MUST be seeded to production volume before the test run. An empty store produces unrealistic query plans, buffer cache behaviour, and lock contention — a service that handles 3 000 RPS on an empty DB may sustain only 600–1 000 RPS under realistic data.
+   - Record `spec.payloads.<pool>.cacheProfile` (see §4 schema) with `targetHitRatio`, `keyCardinality`, and `distributionAlpha` so the §3.5 ANALYZE pass can add a cache-hit-ratio dimension.
+5. LLM assistance is allowed for authoring, but output MUST pass static checks (Gate V2a) and, later, the shape-diff (Gate V3). A hallucinated endpoint/parameter fails V2a and is rejected.
+6. Test code carries the identity header by construction: `baggage: synthetic=true` on every request (k6 OTel extension / `k6/x/tracing`).
 
 **Exit criteria — Gate V2a (static, pre-run):**
 - [ ] `k6 inspect`/parse succeeds (or selected tool's syntax check)
 - [ ] every request in scripts carries `baggage: synthetic=true`
 - [ ] all referenced payload pools exist and match their specs
 - [ ] declared max rate/VU ≤ caps from the approved model
+- [ ] every `dependsOn` step produces a `correlates` extract; its downstream step fails fast if the extract is null
+- [ ] all ramping scenarios end with a ramp-down stage reaching `rate: 0` / `target: 0`
 - [ ] scripts committed to the repo (tests are code)
 
-**Skill boundary:** model→k6 codegen; payload pool generation; V2a checker.
+**Skill boundary:** model→k6 codegen; payload pool generation (Zipf/empirical sampling, key-cardinality sizing); G2 correlation chain generation; V2a checker.
 
-### 3.4 EXECUTE — delegated scoped run
+### 3.4 EXECUTE — small confirmation test, then full delegated run
 
-**Objective:** run the synthesized test exactly as scoped — the same pattern as our fluent-bit / otel-collector / MemoryServer benchmark delegations (Phase 1 evidence: `docs/evidence/*.md`).
+**Objective:** first prove the model at low blast radius (G5 — small confirmation test), then run the full synthesized test exactly as scoped.
+
+#### 3.4.1 Small confirmation test (G5 — new, mandatory pre-step)
+
+**Purpose:** a first-class, low-blast-radius smoke run that validates the model *before* the full test. The agent checks its own homework. If the confirmation test fails, the model is revised (not the full test run).
+
+**Confirmation test parameters:**
+- **Duration:** 3–5 minutes (default).
+- **Scale:** 10–20% of the approved target RPS / VU count.
+- **Scope:** all journeys are exercised, in their approved weight ratios.
+- **Pass criteria (all six must hold — V2b-smoke gate):**
+  1. Zero 5xx errors (or ≤ the per-journey `baseline.errorRate` from the model).
+  2. Every journey step reaches a downstream span in the service graph (no broken routes / 404s).
+  3. Chain correlation succeeds for every step that has a `correlates` data-flow edge — zero null-extract failures.
+  4. Journey mix (distribution over journeys) matches approved weights within TVD ≤ 0.30 (relaxed from V3's 0.15 at reduced scale).
+  5. At least one `synthetic == true` span appears in Dynatrace (proves baggage promotion is in place before the full test).
+  6. `dropped_iterations == 0` at the target-scale rate, confirming `preAllocatedVUs` is sufficient.
+
+If any criterion fails: diagnose, revise the model (structural → back to **VALIDATE**; parameter-only → may iterate without re-validation, see §3.5 iteration rule), and re-run the confirmation test before proceeding. Maximum **2** confirmation retries; on the 3rd failure, escalate to the human.
+
+#### 3.4.2 Full run
 
 **Rules:**
 1. Execution is a **scoped agent run** with a written scope contract: inputs, allowed commands, blast-radius caps, abort conditions, output location.
-2. `run-config.json` (template §5.3) fixes the blast radius: target env (from allowlist), max RPS, max VUs, duration cap, schedule window, and abort thresholds (error-rate > X% or p95 > Y ms → kill).
+2. `run-config.json` (template §5.3) fixes the blast radius: target env (from allowlist), max RPS, max VUs, duration cap, schedule window, and abort thresholds (error-rate > X% or p95 > Y ms → kill). Abort threshold for p99 MUST be set above the `baseline.p99Ms` recorded in the model (not below it).
 3. Target MUST be on the non-production allowlist (P5). The runner refuses otherwise.
 4. Telemetry emitted through the OTel pipeline with `synthetic=true` baggage, so ANALYZE can select test traffic precisely.
 5. The run records its telemetry coordinates (environment, timeframe, trace filter) for ANALYZE.
 
-**Exit criteria — Gate V2b (pre-flight, machine-enforced immediately before start):**
+**Exit criteria — Gate V2b (pre-flight, machine-enforced immediately before full run start):**
 - [ ] target env ∈ allowlist and ≠ production
 - [ ] V2a passed on the exact commit being run
 - [ ] model `status.approval.decision == "approved"` for the model revision the scripts were generated from
-- [ ] caps and abort thresholds loaded and armed
+- [ ] caps and abort thresholds loaded and armed; p99 abort threshold ≥ `baseline.p99Ms`
+- [ ] **small confirmation test passed (all 6 criteria)**
 - [ ] run directory created (`runs/<UTC-timestamp>/`)
 
-**Skill boundary:** scoped-run executor + supervisor (caps, abort), run-report generation.
+**Skill boundary:** scoped-run executor (confirmation test + full run); caps/abort supervisor; confirmation-test pass-criteria checker; run-report generation.
 
 ### 3.5 ANALYZE — shape-diff against production, then iterate
 
@@ -169,7 +262,7 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 2. **Sampling parity.** Compare *rates*, not raw counts, and normalize for the sampling ratio of each dataset. If production is head/tail-sampled at ratio `s_prod` and the test at `s_test`, arrival-shape and fan-out comparisons use sampling-corrected rates; the applied `samplingFactor` is recorded in `shape-diff.json`. Mismatched, unrecorded sampling is the most common false "out of tolerance".
 3. **Scale factor is explicit.** When the test runs at reduced scale, the arrival-shape comparison divides the baseline by a recorded `scalingFactor` (test target RPS ÷ baseline RPS); it is stored in `shape-diff.json`, never inferred silently.
 
-> The illustrative DQL in §3.1 is a *representative* pack, not validated against a live tenant. Per the O11y query-validation gate, every query MUST be run against the target Dynatrace environment and its field names/functions (e.g. entry-span identification, error counting) confirmed against sample output before it is baked into the `baseline-diff`/`workload-model` skills.
+> **DQL validation gate (updated §3.1 now provides live-validated queries).** All queries in this methodology (§3.1 and below) have been validated against a live Dynatrace tenant (oat05854, 2026-10-09). The key field names are: `request.is_root_span` (not `isEntrySpan()`, which is illustrative only), `span.kind`, `duration` in nanoseconds, `start_time`. Any new target tenant MUST have its field names re-confirmed before the queries are run in production.
 
 **Shape-diff dimensions and default tolerances** (overridable via `run-config.tolerances`):
 
@@ -180,6 +273,7 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 | Service fan-out | baseline downstream edges present during test | ≥ 90% of edges present; per-edge rate ratio ∈ [0.5, 2.0] |
 | Error rate | test vs baseline, per journey | absolute Δ ≤ +1.0 pp |
 | Journey mix | distribution over journeys vs weights | total variation distance ≤ 0.15 |
+| **Cache hit ratio** (G4 — new, when `cacheProfile.targetHitRatio` set) | per-endpoint cache hit ratio, test vs baseline | \|Δhit-ratio\| ≤ 0.10 absolute |
 
 **Decision rule:**
 - **All dimensions within tolerance → ACCEPT.** Emit `shape-diff.json` + summary in `run-report.md`; loop turn is complete.
@@ -192,7 +286,7 @@ Each stage below is specified tightly enough to build a skill/MCP against (see �
 
 ## 4. Workload-model JSON schema (draft v1)
 
-Draft-07 JSON Schema. Stored as `loadtests/<target>/workload-model.json`. The `status` block is agent-maintained and carries the Gate V1 trail.
+Draft-07 JSON Schema, **v0.3**. Stored as `loadtests/<target>/workload-model.json`. The `status` block is agent-maintained and carries the Gate V1 trail. **Changes from v0.2:** added `correlates` to `steps` (G2 data-flow), `cacheProfile` to `payloadSpec` (G4), `shape` flag on `arrivalProfile.stages` (G3).
 
 ```json
 {
@@ -241,7 +335,8 @@ Draft-07 JSON Schema. Stored as `loadtests/<target>/workload-model.json`. The `s
                 "required": ["duration", "rate"],
                 "properties": {
                   "duration": { "type": "string", "examples": ["5m", "30m"] },
-                  "rate": { "type": "number", "description": "target iterations/s (open) or VUs (closed)" }
+                  "rate": { "type": "number", "description": "target iterations/s (open) or VUs (closed)" },
+                  "shape": { "enum": ["steady", "ramp_up", "plateau", "ramp_down"], "description": "G3 ramp segment type (informational)" }
                 }
               }
             },
@@ -281,7 +376,34 @@ Draft-07 JSON Schema. Stored as `loadtests/<target>/workload-model.json`. The `s
                     "codeRef": { "type": "string" },
                     "payloadRef": { "type": "string", "description": "key into spec.payloads" },
                     "thinkTime": { "$ref": "#/definitions/thinkTime" },
-                    "dependsOn": { "type": "array", "items": { "type": "string" } }
+                    "dependsOn": { "type": "array", "items": { "type": "string" } },
+                    "correlates": {
+                      "type": "array",
+                      "description": "data-flow edges from prior steps (G2)",
+                      "items": {
+                        "type": "object",
+                        "required": ["sourceStepId", "extract", "inject"],
+                        "properties": {
+                          "sourceStepId": { "type": "string" },
+                          "extract": {
+                            "type": "object",
+                            "required": ["from", "path"],
+                            "properties": {
+                              "from": { "enum": ["body_json", "header", "body_html", "body_regex"] },
+                              "path": { "type": "string" }
+                            }
+                          },
+                          "inject": {
+                            "type": "object",
+                            "required": ["into", "as"],
+                            "properties": {
+                              "into": { "enum": ["header", "path_param", "query_param", "body_field"] },
+                              "as": { "type": "string" }
+                            }
+                          }
+                        }
+                      }
+                    }
                   }
                 }
               },
@@ -367,7 +489,17 @@ Draft-07 JSON Schema. Stored as `loadtests/<target>/workload-model.json`. The `s
             }
           }
         },
-        "seed": { "type": "integer" }
+        "seed": { "type": "integer" },
+        "cacheProfile": {
+          "type": "object",
+          "description": "G4 cache-avoidance / hit-ratio targeting",
+          "properties": {
+            "targetHitRatio": { "type": "number", "minimum": 0, "maximum": 1, "description": "production cache hit ratio to reproduce" },
+            "keyCardinality": { "type": "integer", "description": "K = unique key pool size (derived from sizing math: R × T × m_prod at minimum)" },
+            "distributionAlpha": { "type": "number", "description": "Zipf α fitted from production key-access telemetry (omit for uniform)" },
+            "backingStoreSeeded": { "type": "boolean", "description": "true when the target DB/store has been seeded to production volume" }
+          }
+        }
       }
     }
   }
@@ -459,11 +591,12 @@ loadtests/
 
 | Gate | After | Type | Enforced by | Blocks until |
 |---|---|---|---|---|
-| **G0** model integrity | SCOPE | machine | workload-model skill (schema + coverage + linking + Little's law) | VALIDATE offered |
+| **G0** model integrity | SCOPE | machine | workload-model skill (schema + coverage + ≤6 journeys + linking + Little's law + correlates + cacheProfile) | VALIDATE offered |
 | **V1** scenario approval | SCOPE → SYNTHESIZE | **human** | Paperclip confirmation bound to model revision | any synthesis |
-| **V2a** static checks | SYNTHESIZE → EXECUTE | machine | k6-synthesis skill (parse, baggage, pools, caps, committed) | any run |
-| **V2b** pre-flight | EXECUTE start | machine | loadtest-run skill (allowlist, approval-valid, caps armed) | process start |
-| **V3** shape tolerance | ANALYZE | machine + human cap | baseline-diff skill; iteration ≤ 3 then human | accept / escalate |
+| **V2a** static checks | SYNTHESIZE → EXECUTE | machine | k6-synthesis skill (parse, baggage, pools, caps, correlates chain, ramp-down, committed) | any run |
+| **V2b-smoke** small confirmation test | pre-full-run | machine | loadtest-run skill (6 pass criteria incl. `synthetic` visible, zero null-extracts, `dropped_iterations==0`) | full-run start |
+| **V2b** pre-flight | full-run start | machine | loadtest-run skill (allowlist, approval-valid, caps armed, V2b-smoke passed) | process start |
+| **V3** shape tolerance | ANALYZE | machine + human cap | baseline-diff skill (6 dimensions incl. cache hit ratio); iteration ≤ 3 then human | accept / escalate |
 
 Invariant: **V1 approval hash-bound to model revision** is the anchor of the whole loop — every later gate re-verifies it (`V2b` checks `status.approval.revision` + `hash`).
 
@@ -511,6 +644,14 @@ Presentation storyline: *we already delegate execution credibly (evidence) → h
 ## 10. Document status
 
 - v0.1 drafted by backup_Architect, 2026-09-08, per [ISI-4045](/ISI/issues/ISI-4045).
-- v0.2 O11y review by Observability Agent, 2026-09-08: added baggage→attribute promotion prerequisite (P4, §7.7), sampling-parity + explicit scaling in ANALYZE (§3.5), DQL query-validation gate note, and `scalingFactor`/`samplingFactor` in `shape-diff.json`. Review verdict: **approved from the observability standpoint; acceptance criteria met** — loop and gates are precise enough to build skills against.
-- Pending Gate-V1-style board validation of this document (approval of the methodology itself, mirroring §3.2).
+- v0.2 O11y review by Observability Agent, 2026-09-08: added baggage→attribute promotion prerequisite (P4, §7.7), sampling-parity + explicit scaling in ANALYZE (§3.5), DQL query-validation gate note, and `scalingFactor`/`samplingFactor` in `shape-diff.json`. Review verdict: **approved from the observability standpoint; acceptance criteria met**.
+- v0.3 brainstorm synthesis by BigBoss, 2026-10-09, per [ISI-5622](/ISI/issues/ISI-5622): closes G1–G5 from the four-specialist brainstorm ([ISI-5625](/ISI/issues/ISI-5625), [ISI-5626](/ISI/issues/ISI-5626), [ISI-5627](/ISI/issues/ISI-5627), [ISI-5628](/ISI/issues/ISI-5628)).
+  - **G1** — front-end auto-discovery (§3.1 step 2a): earliest-start root-span + noise classifier + edge-server fallback; replaces `isEntrySpan()` with validated `request.is_root_span == true`. Journey clustering to ≤6 named scenarios via Jaccard ≥ 0.6 + op-name stem merge.
+  - **G2** — request chaining and correlation (§3.3 rule 3): `correlates` field in step schema; cookie isolation; extract→inject pattern; fail-fast on broken chain.
+  - **G3** — ramp-up / ramp-down shaping (§3.1 step 5 + §3.3 rule 2): CoV gate (<0.15 = steady; else piecewise-linear ≤6 stages); ramp-down tail mandatory; Little's Law sourced from server span not load-driver wrapper; `shape` flag on `arrivalProfile.stages`.
+  - **G4** — cache-avoidance dataset strategy (§3.3 rule 4 + §3.5 cache-hit-ratio dimension): reproduce-production-cache-ratio goal; Zipf sizing math; `cacheProfile` in `payloadSpec` schema.
+  - **G5** — small confirmation test (§3.4.1): first-class pre-full-run smoke run with 6 pass criteria incl. `synthetic==true` span presence; V2b-smoke gate added.
+  - Schema delta: `correlates` on steps, `cacheProfile` on `payloadSpec`, `shape` on `arrivalProfile.stages`.
+  - 4 open questions for Henrik in `docs/phase-g1g3-observability-extraction.md` §Open questions: front-end semantics in prod vs non-prod windows, ramp demo approach, Jaccard threshold tuning, think-time distribution default.
+  - **Pending Gate-V1-style board validation of v0.3** — awaiting Henrik's confirmation.
 - Phase 3 ([ISI-4046](/ISI/issues/ISI-4046)) consumes §8; Phase 4 demo ([ISI-4047](/ISI/issues/ISI-4047)) executes §3 end-to-end on one target; Phase 5 deck ([ISI-4048](/ISI/issues/ISI-4048)) narrates §1–§2.
