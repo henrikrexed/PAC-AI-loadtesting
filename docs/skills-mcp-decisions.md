@@ -69,7 +69,7 @@ below.
 
 | Option | What it gives | Verdict |
 |---|---|---|
-| **`grafana/mcp-k6`** (official k6 MCP server, Go, *preview*) | `validate_script` (1 VU/1 iter smoke), `run_script` (VUs/duration/stages), k6 docs browsing, guided script generation — callable from any MCP client | **USE.** Commodity k6 engine surface; do not rebuild. Anchors (b) validation loop and gives a dev-loop path for (c). |
+| **`grafana/mcp-k6`** (official k6 MCP server, Go, *preview*) | `validate_script` (1 VU/1 iter smoke), `run_script` (VUs/duration/stages), k6 docs browsing, guided script generation — callable from any MCP client | **OPTIONAL dev-loop convenience — NOT a dependency** (revised per board direction [ISI-5622](/ISI/issues/ISI-5622), 2026-10-09). We do **not** use it to *generate* scripts (generation is our own deterministic renderer) nor rely on it for execution (the **k6 binary** in our scoped harness is the engine). May be used ad hoc for a `validate_script`/`run_script` dev smoke. Exact capability (launch-only vs also validate/generate) to be confirmed under [ISI-5635](/ISI/issues/ISI-5635). |
 | **Grafana Assistant — NL→k6 script authoring** | Proves the pattern: natural language + telemetry → validated k6 scripts, grounded in Grafana Cloud telemetry | **Pattern reference, do not adopt as tool.** Grafana-Cloud-bound; our telemetry is in Dynatrace. We replicate the *pattern* (LLM + validation loop) locally, grounded in our workload-model + `mcp-k6` `validate_script`. |
 | **Tracetest** (trace-based assertions; k6 integration) | Trigger request → wait for trace → assert on spans; strongest dedicated trace-based-testing tool in 2026 | **Optional Phase 4+ add-on**, not a core loop capability. Complements (d) with internal-span assertions during load; parked as a stretch backlog item, not a decision-table row. |
 | **Speedscale** | OTel-trace-based traffic replay + CI release gates | **Commercial reference only** (per issue). Closest off-the-shelf to "replay from observability"; cite in the deck as the market comparison, do not adopt. |
@@ -82,13 +82,15 @@ below.
 | # | Capability | Decision | Primary tool | Bespoke glue we build | Rationale (dominant criterion) |
 |---|---|---|---|---|---|
 | **a** | **workload-model** (SCOPE) | **BUILD SKILL** | dtctl (`query` DQL) | `pac-workload-model` skill: parameterized DQL set → RPS profile, endpoint mix, latency p50/p95/p99, error/retry, span-tree journeys, service graph, think-time; emits **workload-model JSON** (schema owned by Phase 2) | Bespoke to our Dynatrace tenant + our JSON schema; must be deterministic & versioned (observability-as-code). No MCP maps "DT traces → workload-model." Reuses dtctl we already own + ISI-3243/3221 DQL. |
-| **b** | **k6-synthesis** (SYNTHESIZE) | **USE MCP + thin BUILD** | `grafana/mcp-k6` (`validate_script`, guided generation) | `pac-k6-synth` skill: map workload-model JSON → k6 scenarios (arrival-rate *open* executors for public APIs, VU *closed* for seat-limited; Little's Law check) + PII-free synthetic payloads matching prod distributions | k6 authoring/validation is a commodity → use `mcp-k6`, don't rebuild. But schema→scenario mapping + synthetic-data shaping is bespoke and PII-sensitive → thin skill. Replicates the Grafana Assistant pattern on our stack. |
+| **b** | **k6-synthesis** (SYNTHESIZE) | **BUILD SKILL (own the generation)** | our deterministic renderer + k6 binary `--dry-run`; `mcp-k6 validate_script` optional | `pac-k6-synth` renderer: map workload-model JSON → k6 scenarios (arrival-rate *open* executors for public APIs, VU *closed* for seat-limited; Little's Law check) + PII-free synthetic payloads matching prod distributions; **own static checker (V2a)** | Generation must be deterministic & golden-testable → we own the renderer, not an MCP (board direction ISI-5622). No dependency on `mcp-k6` guided generation. |
 | **c** | **loadtest-run** (EXECUTE) | **BUILD SKILL (reuse harness)** | Benchmark harness pattern (scoped K8s Job) + k6 runtime; `mcp-k6 run_script` for dev loop | `pac-loadtest-run` skill: package a k6 script as a **scoped** run (ConfigMap Job, `backoffLimit 0`), OTel metrics/traces export, **`synthetic=true`** resource attr/baggage, artifact capture | This *is* the parent's "delegate execution with a proper scope" thesis — our harness already proves it (fluent-bit/otel-collector/MemoryServer). No new MCP; wrap what we own. `mcp-k6 run_script` covers only the local dev loop, not scoped/delegated in-cluster runs. |
 | **d** | **baseline-diff** (ANALYZE) | **BUILD SKILL** | dtctl (`query` DQL) + `dt-app-dashboards` skill | `pac-baseline-diff` skill: DQL comparing `synthetic=true` test window vs prod baseline window — RPS shape, latency histograms, service fan-out, error rates — against tolerance thresholds → pass/fail + iterate signal; optional versioned DT dashboard/notebook | Direct transfer of the ISI-3243/ISI-3221 dashboard-lock DQL-diff pattern. Must be deterministic, thresholded, versioned — a skill, not interactive MCP. Dynatrace MCP is a discovery supplement only. |
 
-**Summary:** 3 skills to build (a, c, d) + 1 hybrid (b: use `mcp-k6`, build the thin mapping
-skill). One MCP adopted (`grafana/mcp-k6`). Zero net-new MCP servers authored. dtctl carries
-both Dynatrace-facing stages.
+**Summary:** 4 skills to build (a, b, c, d) — **script generation is ours** (deterministic
+renderers), not delegated to any MCP (board direction [ISI-5622](/ISI/issues/ISI-5622),
+2026-10-09). `grafana/mcp-k6` is an **optional dev-loop convenience, not a dependency**; the k6
+**binary** is the execution engine. Zero net-new MCP servers authored. dtctl carries both
+Dynatrace-facing stages.
 
 ---
 
@@ -103,15 +105,18 @@ useful for the *first* interactive pass to find the right entities, but the repe
 must be a fixed DQL skill. Cardinality guard: cap journey enumeration to the top-N most
 regular traces (the issue's "most regular traces") to avoid dimensional explosion.
 
-### (b) k6-synthesis → USE `grafana/mcp-k6` + thin BUILD `pac-k6-synth`
-Do not re-implement a k6 authoring/validation engine — `mcp-k6` already exposes
-`validate_script` (fast 1-VU/1-iter smoke that returns actionable errors) and guided
-generation. The genuinely bespoke part is deterministically translating our workload-model
-JSON into correct k6 executors (open arrival-rate vs closed VU, ramp shapes, think-time) and
-generating synthetic payloads that match production distributions **without PII**. That is a
-thin skill whose output is *always* piped through `mcp-k6 validate_script` before it is
-allowed downstream — LLM output is never trusted un-validated (research-note guardrail).
-Gated behind stage-2 human VALIDATE.
+### (b) k6-synthesis → BUILD `pac-k6-synth` renderer (own the generation; MCP is not a dependency)
+**Revised per board direction ([ISI-5622](/ISI/issues/ISI-5622), 2026-10-09): do not rely on the
+k6 MCP to generate scripts.** Script generation is our own **deterministic renderer** (model →
+k6), so output is reproducible and golden-testable — we never delegate generation to `mcp-k6`'s
+"guided generation" or any LLM-authoring surface. The bespoke core is translating our
+workload-model JSON into correct k6 executors (open arrival-rate vs closed VU, ramp shapes,
+think-time) and generating synthetic payloads matching production distributions **without PII**.
+Validation of the generated script is done by a **deterministic static checker we own** (V2a); a
+k6 `validate_script` (via `mcp-k6` *or* `k6 --dry-run` on the binary) may be used as an *optional*
+extra smoke in the local dev loop, but is **not** required or depended upon. Gated behind stage-2
+human VALIDATE. (Whether `mcp-k6` even offers more than launch is being confirmed under
+[ISI-5635](/ISI/issues/ISI-5635).)
 
 ### (c) loadtest-run → BUILD SKILL `pac-loadtest-run` (reuse benchmark harness)
 This capability is the literal demonstration of the parent's first thesis: *test execution
