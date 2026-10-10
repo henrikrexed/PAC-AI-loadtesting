@@ -1,0 +1,32 @@
+{
+  "_comment": "Live extraction from Dynatrace oat05854, service crewai-deepseek-agent (CrewAI + DeepSeek via LiteLLM, ns agentapp), deployed+loaded by ISI-5644. Captured 2026-10-09 by the workload-model skill. GENERALIZATION TEST for ISI-5630: same skill, different app. Every number from a live dtctl DQL run.",
+  "environment": "oat05854",
+  "timeframe": "2026-10-09T08:33Z/2026-10-09T09:01Z (active load window)",
+  "window_seconds": 1680,
+  "access_log_availability": "unavailable",
+  "access_log_probe": "no istio-proxy log records on tenant; spans-only (same as astronomy-shop run)",
+  "sampling_ratio": 1.0,
+  "front_end": {
+    "resolved": "crewai-deepseek-agent",
+    "resolved_op": "crewai-deepseek-agent/request",
+    "method": "earliest-start root span per trace; single clean entry (303 traces), no noise classifier hits",
+    "ingress_crosscheck": "N/A — no mesh access logs; single-service agent app"
+  },
+  "entry_traces": 303,
+  "terminal_signal": "execute_tool  (AGENTIC_TOOL_PATTERNS) — does the agent turn invoke a tool?",
+  "archetype_split": {
+    "agentic_tool_using": {"traces": 97, "weight": 0.3201, "baseline": {"p50Ms": 3338, "p95Ms": 6072, "p99Ms": 35061, "errorRate": 0.0}, "mean_ms": 3695},
+    "conversational_pure_llm": {"traces": 206, "weight": 0.6799, "baseline": {"p50Ms": 1235, "p95Ms": 1776, "p99Ms": 16350, "errorRate": 0.0}, "mean_ms": 1612}
+  },
+  "reconstructed_flows": {
+    "agentic": "request -> agent.turn -> Crew Created -> Task Created -> llm.call -> chat -> execute_tool -> Tool Usage -> llm.call -> chat -> finalize -> message.sent  (ReAct loop: LLM -> tool -> LLM)",
+    "conversational": "request -> agent.turn -> Crew Created -> Task Created -> llm.call -> chat -> finalize -> message.sent  (single LLM round)"
+  },
+  "per_minute_curve_rpm": [2, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 2],
+  "per_minute_cov": {"meanRpm": 11.22, "cov": 0.233, "bins": 27, "minRpm": 2, "maxRpm": 12},
+  "blended_mean_ms": 2279,
+  "arrival_rate_tps_active": 0.187,
+  "observed_concurrency_active": 0.411,
+  "tool_breakdown": {"execute_tool_total": 180},
+  "llm_call_baseline_ms": {"p50": 996, "p95": 1762, "p99": 2716, "mean": 1064, "n": 486}
+}
