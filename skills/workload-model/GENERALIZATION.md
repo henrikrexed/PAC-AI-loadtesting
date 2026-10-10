@@ -66,3 +66,25 @@ fix** fell out of the real data: partial Grail boundary bins were falsely trippi
 gate; `trim_partial_bins` now removes them so steady constant-arrival traffic is read as steady.
 
 Artifacts: `loadtests/crewai-deepseek-agent/{workload-model.json,scenario-proposal.md}`.
+
+## What the agent actually generates (board Q, 2026-10-10)
+
+The telemetry captures structure + model (`gen_ai.request.model = deepseek/deepseek-chat`) but
+**no response content** (spans carry no prompt/completion text — by design; no app logs reach
+Grail). To show the agent's real output I invoked the live pod (`POST /request`) directly:
+
+- **Conversational turn** — prompt *"Explain distributed tracing in two sentences."* →
+  > Distributed tracing is a technique for tracking a single request as it flows through multiple
+  > services in a distributed system, using unique trace and span identifiers to correlate related
+  > operations. It helps engineers visualize end-to-end latency, pinpoint bottlenecks, and debug
+  > failures across service boundaries.
+- **Agentic turn (calculator)** — prompt *"What is 1234 * 5678? Use the calculator tool."* →
+  > 1234 * 5678 = 7006652   *(correct; tool-computed)*
+- **Agentic turn (web_search)** — prompt *"Search the web for the latest OTel release…"* → the
+  agent ran 3 searches, the stubbed search tool returned placeholders, and the agent **refused to
+  fabricate** a version ("Because the tool output contained no verifiable facts, I cannot provide
+  a grounded summary…"). Honest, grounded behavior.
+
+These map 1:1 to the model's two archetypes: a chat turn = **Conversational**, a tool turn =
+**Agentic (ReAct)**. The agent generates correct results; the workload model captures the two
+behaviors at their true 68/32 mix.
