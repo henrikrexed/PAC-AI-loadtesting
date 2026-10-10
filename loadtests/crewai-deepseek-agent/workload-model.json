@@ -5,19 +5,19 @@
     "name": "crewai-deepseek-agent",
     "targetService": "crewai-deepseek-agent",
     "environment": "oat05854",
-    "generatedAt": "2026-10-10T09:10:00Z",
+    "generatedAt": "2026-10-10T09:05:00Z",
     "source": {
       "tool": "dtctl",
       "timeframe": "2026-10-10T08:35:58Z -> 2026-10-10T09:01:31Z (25m33s, deploy-free/incident-free k6 window)",
-      "timeframeNotes": "clean deploy-free/incident-free k6 window (25m33s). Co-tenant astronomy-shop / honcho / memos / flagd entries excluded by service scope; front-end discovery resolved crewai-deepseek-agent/request (301 root spans) unambiguously. CoV on the two partial boundary minutes is an edge artifact (0.166); true interior arrival is steady (0.016).",
+      "timeframeNotes": "deploy-free/incident-free k6 window; single-service agent app, entry scoped to crewai-deepseek-agent (co-tenant astronomy-shop dropped by scope)",
       "queries": [
-        "fetch spans | filter request.is_root_span==true | sort start_time asc | summarize takeFirst(service.name),takeFirst(span.name) by trace.id | summarize count() by entryService,entryOp  (G1-C front-end discovery -> crewai-deepseek-agent/request, 301 traces)",
-        "fetch logs | filter k8s.container.name=='istio-proxy' | summarize count()  (access-log availability probe -> 0 lines => spans-only)",
-        "fetch spans | filter is_root_span && service.name=='crewai-deepseek-agent' && span.name=='crewai-deepseek-agent/request' | join [spans|filter span.name=='execute_tool'|summarize count() by trace.id] leftOuter on trace.id | summarize count() by archetype  (behavioral split: Agentic 96 / Conversational 205)",
-        "fetch spans | filter span.name=='execute_tool' | summarize n=count() by trace.id | limit 1 | join [spans] inner on trace.id | sort start_time asc  (JOURNEY STEP RECONSTRUCTION from the trace span-tree, both archetypes)",
-        "fetch spans | filter span.name=='agent.turn' && service.name=='crewai-deepseek-agent' | summarize percentile(duration,50/95/99),avg(duration),sum(duration),count()  (per-turn baseline + Little's Law busy-time integral)",
-        "fetch spans | filter span.name=='execute_tool' | summarize count() by tool.name  (tools observed: web_search 141, calculator 38)",
-        "fetch spans | filter is_root_span && service.name=='crewai-deepseek-agent' | summarize count() by bin(start_time,1m) | summarize avg,stddev  (G3-B CoV: interior 0.016 steady)"
+        "fetch spans | filter is_root_span && service.name=='crewai-deepseek-agent' | sort start_time asc | summarize takeFirst(span.name) by trace.id | summarize count() by entryOp  (front-end discovery -> single entry request, 301 traces)",
+        "fetch logs | filter k8s.container.name=='istio-proxy' over window -> 0 lines  (access-log probe, spans-only)",
+        "fetch spans | join [spans|sort start_time asc|summarize collectArray(span.name) by trace.id] on trace.id  (JOURNEY reconstruction: ReAct loop vs single LLM round)",
+        "fetch spans | summarize countIf(span.name=='execute_tool') by trace.id | summarize count() by usesTool  (archetype split via AGENTIC_TOOL_PATTERNS -> 96 agentic / 205 conversational)",
+        "fetch spans | filter span.name=='agent.turn' | summarize percentile(duration,50/95/99),avg by usesTool  (per-archetype baseline)",
+        "fetch spans | filter request | summarize count() by bin(start_time,1m)  (G3-B arrival curve; interior CoV 0.016 -> steady)",
+        "fetch spans | filter span.name=='agent.turn' | summarize sum(duration) / window  (observed concurrency 0.448)"
       ],
       "evidenceSources": [
         "span"
@@ -50,7 +50,7 @@
     "journeys": [
       {
         "id": "conversational",
-        "description": "Conversational \u2014 pure-LLM turn (no tool call). Reconstructed from the trace span-tree: crewai-deepseek-agent/request -> agent.turn -> Crew Created -> Task Created -> llm.call -> chat -> finalize -> message.sent. One HTTP driver step (POST /request); the internal span tree runs server-side within that request. Terminal signal = execute_tool (absent).",
+        "description": "Conversational \u2014 pure-LLM turn (single round); no tool. Reconstructed internal flow: crewai-deepseek-agent/request -> agent.turn -> Crew Created -> Task Created -> llm.call -> chat -> finalize -> message.sent",
         "weight": 0.6811,
         "entrypoint": "crewai-deepseek-agent/request",
         "codeRef": "deploy/agentapp/app/main.py#handle_request",
@@ -59,17 +59,19 @@
           {
             "id": "s1",
             "service": "crewai-deepseek-agent",
-            "operation": "POST /request {turn_type:chat}",
+            "operation": "POST /request",
             "callType": "http",
             "codeRef": "deploy/agentapp/app/main.py#handle_request",
             "evidenceSource": "span",
-            "payloadRef": "chat_prompt",
-            "baseline": {
-              "p50Ms": 1235,
-              "p95Ms": 1787,
-              "p99Ms": 16350,
-              "errorRate": 0.0
-            }
+            "payloadRef": "prompt_chat"
+          },
+          {
+            "id": "s2",
+            "service": "crewai-deepseek-agent",
+            "operation": "llm.call (deepseek-chat via LiteLLM)",
+            "callType": "http",
+            "codeRef": "deploy/agentapp/app/agent.py#TracedLLM.call",
+            "evidenceSource": "span"
           }
         ],
         "baseline": {
@@ -81,7 +83,7 @@
       },
       {
         "id": "agentic",
-        "description": "Agentic \u2014 tool-using turn (ReAct loop: execute_tool). Reconstructed from the trace span-tree: crewai-deepseek-agent/request -> agent.turn -> Crew Created -> Task Created -> llm.call -> chat -> execute_tool(web_search|calculator) -> Tool Usage -> llm.call -> chat -> (ReAct loop) -> finalize -> message.sent. One HTTP driver step (POST /request); the internal span tree runs server-side within that request. Terminal signal = execute_tool (present).",
+        "description": "Agentic \u2014 tool-using turn (ReAct: LLM -> tool -> LLM); reaches execute_tool. Reconstructed internal flow: crewai-deepseek-agent/request -> agent.turn -> Crew Created -> Task Created -> llm.call -> chat -> execute_tool(web_search|calculator) -> Tool Usage -> llm.call -> chat -> (ReAct loop) -> finalize -> message.sent",
         "weight": 0.3189,
         "entrypoint": "crewai-deepseek-agent/request",
         "codeRef": "deploy/agentapp/app/main.py#handle_request",
@@ -90,17 +92,19 @@
           {
             "id": "s1",
             "service": "crewai-deepseek-agent",
-            "operation": "POST /request {turn_type:tool}",
+            "operation": "POST /request",
             "callType": "http",
             "codeRef": "deploy/agentapp/app/main.py#handle_request",
             "evidenceSource": "span",
-            "payloadRef": "tool_prompt",
-            "baseline": {
-              "p50Ms": 3338,
-              "p95Ms": 6072,
-              "p99Ms": 35061,
-              "errorRate": 0.0
-            }
+            "payloadRef": "prompt_agentic"
+          },
+          {
+            "id": "s2",
+            "service": "crewai-deepseek-agent",
+            "operation": "llm.call (deepseek-chat via LiteLLM)",
+            "callType": "http",
+            "codeRef": "deploy/agentapp/app/agent.py#TracedLLM.call",
+            "evidenceSource": "span"
           }
         ],
         "baseline": {
@@ -112,56 +116,32 @@
       }
     ],
     "payloads": {
-      "tool_prompt": {
+      "prompt_agentic": {
         "fields": [
           {
-            "name": "prompt",
-            "type": "enum",
+            "name": "task",
+            "type": "string",
             "generator": "const",
             "values": [
-              "What is 3 * (47 + 19)? Show the result.",
-              "Search for the latest on OpenTelemetry gen_ai semantic conventions and summarize.",
-              "Compute (1024 / 8) + 256 and explain the result briefly.",
-              "What is 15% of 2480? Use the calculator.",
-              "Search for the definition of the ReAct agent pattern and summarize it."
-            ],
-            "distribution": "uniform"
-          },
-          {
-            "name": "turn_type",
-            "type": "enum",
-            "generator": "const",
-            "values": [
-              "tool"
+              "search the web for the latest OTel release and summarize",
+              "calculate the 95th percentile of these latencies"
             ],
             "distribution": "weighted"
           }
         ],
         "seed": 42
       },
-      "chat_prompt": {
+      "prompt_chat": {
         "fields": [
           {
-            "name": "prompt",
-            "type": "enum",
+            "name": "task",
+            "type": "string",
             "generator": "const",
             "values": [
-              "In one sentence, what is observability?",
-              "Explain the difference between a trace and a span briefly.",
-              "What is a load test? Answer in two sentences.",
-              "What is Little's Law? One sentence.",
-              "Define 'p95 latency' in one sentence."
+              "explain distributed tracing in one paragraph",
+              "what is Little's Law"
             ],
             "distribution": "uniform"
-          },
-          {
-            "name": "turn_type",
-            "type": "enum",
-            "generator": "const",
-            "values": [
-              "chat"
-            ],
-            "distribution": "weighted"
           }
         ],
         "seed": 42
@@ -169,13 +149,13 @@
     },
     "caps": {
       "maxRps": 2,
-      "maxVus": 40,
+      "maxVus": 20,
       "maxDuration": "30m"
     },
     "coverage": 1.0
   },
   "status": {
     "revision": 1,
-    "hash": "sha256:ba345efa9898b4946c0ca3fb35485f90d4230b0d371adfb179c6a56fd7854dba"
+    "hash": "sha256:6e095cbfafb425da1c3217510353beb7486f791a4a31c3ca56e66544c41993cc"
   }
 }

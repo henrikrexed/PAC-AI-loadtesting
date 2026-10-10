@@ -13,7 +13,7 @@
 - **Coverage:** 100.0% of application entry traffic
 - **Evidence sources:** span
 
-**Access logs unavailable — spans-only extraction.** No Istio/Envoy `istio-proxy` log records were present on this tenant (probe returned 0 lines); the HTTP surface was recovered from server-span `span.name` routes instead of the mesh access log. The `istio-ingressgateway` cross-check (§3.1 step 2b) is therefore N/A; the front-end was resolved from the span graph (edge server `frontend-proxy`/`ingress`) and reach-confirmed. Un-instrumented hops that only an access log would reveal are not captured.
+**Access logs unavailable — spans-only extraction.** No Istio/Envoy `istio-proxy` log records were present on this tenant (probe returned 0 lines); the HTTP surface was recovered from server-span `span.name` routes instead of the mesh access log. The `istio-ingressgateway` cross-check (§3.1 step 2b) is therefore N/A; the front-end was resolved from the span graph (entry server span `frontend-proxy`) and reach-confirmed. Un-instrumented hops that only an access log would reveal are not captured.
 
 ## Journeys to be tested
 | id | weight | entrypoint | codeRef | baseline p95 (ms) | evidence |
@@ -34,9 +34,7 @@ wrapper — the wrapper bakes in think-time and would inflate concurrency by ord
 - `product` (1 field(s)) · cacheProfile: targetHitRatio=0.99, keyCardinality=10, alpha=0.1
 - `checkout` (3 field(s))
 
-PII stance: synthetic payloads only; generators are PII-free by construction. Product-catalog
-keys reuse the real catalog SKU set (telemetry-derived) so the production cache hit ratio is
-reproduced rather than collapsed.
+PII stance: synthetic payloads only; generators are PII-free by construction. Cache-fronted payload keys reuse the real telemetry-derived key set so the production cache hit ratio is reproduced rather than collapsed.
 
 ## Where it will run
 - **Target environment (allowlist):** staging / non-production allowlist (production forbidden without board approval)
