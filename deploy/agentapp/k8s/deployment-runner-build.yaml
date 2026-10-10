@@ -1,0 +1,74 @@
+# Runner-build deployment variant (ISI-5644).
+#
+# The ProxOps runner has no container builder/daemon and the cluster exposes no registry the
+# deployer SA can push to, so instead of baking an image we run the stock python:3.12-slim
+# image, mount the app code from the `agent-code` ConfigMap, and have an initContainer pip-
+# install the dependencies into a shared emptyDir (PYTHONPATH=/pkgs). Functionally identical
+# to deployment.yaml (the canonical Dockerfile-based path); use that one wherever a builder +
+# registry exist. Only external need here is PyPI + base-image egress, which the cluster has
+# (the app itself egresses to api.deepseek.com).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crewai-deepseek-agent
+  namespace: agentapp
+  labels: { app: crewai-deepseek-agent, pac.lt/issue: ISI-5644 }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: crewai-deepseek-agent } }
+  template:
+    metadata:
+      labels: { app: crewai-deepseek-agent, pac.lt/issue: ISI-5644 }
+      annotations: { sidecar.istio.io/inject: "false" }
+    spec:
+      initContainers:
+        - name: pip-install
+          image: python:3.12-slim
+          command: ["/bin/sh", "-c"]
+          args:
+            - "pip install --no-cache-dir --target=/pkgs -r /app/requirements.txt"
+          volumeMounts:
+            - { name: code, mountPath: /app }
+            - { name: pkgs, mountPath: /pkgs }
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits:   { cpu: "1",  memory: 1Gi }
+      containers:
+        - name: agent
+          image: python:3.12-slim
+          workingDir: /app
+          command: ["/bin/sh", "-c"]
+          args:
+            - "PYTHONPATH=/pkgs python -m uvicorn main:app --host 0.0.0.0 --port 8080"
+          ports:
+            - { containerPort: 8080, name: http }
+          env:
+            - { name: PYTHONPATH, value: "/pkgs" }
+            - { name: OTEL_SERVICE_NAME, value: "crewai-deepseek-agent" }
+            - { name: OTEL_SERVICE_NAMESPACE, value: "agentapp" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://agent-collector.agentapp.svc.cluster.local:4318" }
+            - { name: DEEPSEEK_MODEL, value: "deepseek/deepseek-chat" }
+            - { name: DEEPSEEK_BASE_URL, value: "https://api.deepseek.com" }
+            - name: DEEPSEEK_API_KEY
+              valueFrom: { secretKeyRef: { name: deepseek-api, key: apiKey } }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 60
+            periodSeconds: 20
+            failureThreshold: 6
+          resources:
+            requests: { cpu: 100m, memory: 512Mi }
+            limits:   { cpu: 500m, memory: 1Gi }
+          volumeMounts:
+            - { name: code, mountPath: /app }
+            - { name: pkgs, mountPath: /pkgs }
+      volumes:
+        - name: code
+          configMap: { name: agent-code }
+        - name: pkgs
+          emptyDir: {}
