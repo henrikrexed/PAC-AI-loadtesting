@@ -117,14 +117,23 @@ def render_proposal(
         payload_lines.append(f"- `{pid}` ({len(pool.get('fields', []))} field(s)){cp_note}")
     payload_block = "\n".join(payload_lines) or "- (none)"
 
+    # Cache-reuse PII note only applies when a payload actually carries a cacheProfile
+    # (commerce catalogs); omit it for workloads with no cache-fronted payload (e.g. agent apps).
+    has_cache = any(p.get("cacheProfile") for p in spec.get("payloads", {}).values())
+    cache_pii = (
+        " Cache-fronted payload keys reuse the real telemetry-derived key set so the production "
+        "cache hit ratio is reproduced rather than collapsed."
+        if has_cache else ""
+    )
+
     access = src.get("accessLogAvailability")
     access_caveat = (
         "**Access logs unavailable — spans-only extraction.** No Istio/Envoy `istio-proxy` "
         "log records were present on this tenant (probe returned 0 lines); the HTTP surface "
         "was recovered from server-span `span.name` routes instead of the mesh access log. "
         "The `istio-ingressgateway` cross-check (§3.1 step 2b) is therefore N/A; the front-end "
-        "was resolved from the span graph (edge server `frontend-proxy`/`ingress`) and reach-"
-        "confirmed. Un-instrumented hops that only an access log would reveal are not captured."
+        f"was resolved from the span graph (entry server span `{meta['targetService']}`) and "
+        "reach-confirmed. Un-instrumented hops that only an access log would reveal are not captured."
         if access == "unavailable"
         else f"Access-log availability: **{access}**."
     )
@@ -182,9 +191,7 @@ wrapper — the wrapper bakes in think-time and would inflate concurrency by ord
 ## Payload strategy
 {payload_block}
 
-PII stance: synthetic payloads only; generators are PII-free by construction. Product-catalog
-keys reuse the real catalog SKU set (telemetry-derived) so the production cache hit ratio is
-reproduced rather than collapsed.
+PII stance: synthetic payloads only; generators are PII-free by construction.{cache_pii}
 
 ## Where it will run
 - **Target environment (allowlist):** {target_env}

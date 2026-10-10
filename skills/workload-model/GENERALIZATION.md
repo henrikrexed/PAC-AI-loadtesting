@@ -42,8 +42,27 @@ At n≈18 the weights are directionally right but statistically thin, and there 
 arrival curve to derive pace / CoV / ramp. The board's exact ask — a **Goose recipe or CrewAI +
 DeepSeek** app under **representative load** — needs that workload deployed and driven first.
 
-## Follow-up
+## Definitive run: CrewAI + DeepSeek under load (ISI-5644 done)
 
-Child issue created to deploy a Goose recipe or CrewAI + DeepSeek agent app in the cluster,
-instrument it (OTel → Dynatrace), and generate representative load, after which this skill runs
-unchanged to produce its workload model. The skill side is ready; the blocker is the app+load.
+ProxOps deployed `crewai-deepseek-agent` (CrewAI, `deepseek/deepseek-chat` via LiteLLM, ns
+`agentapp`) and drove it with in-cluster k6 (constant-arrival 12/min, 25 min, 30% tool mix,
+`http_req_failed` 0.0099). The skill ran **unchanged** (`scripts/build_crewai.py`,
+`fixtures/crewai_deepseek_extract.json`); G0 **12/12 PASS**:
+
+| aspect | result |
+|---|---|
+| front-end discovery | `crewai-deepseek-agent/request` (single clean entry, 301 traces) |
+| journey reconstruction | agentic ReAct loop (`request→turn→Crew/Task Created→llm.call→chat→execute_tool→llm.call→finalize`) vs conversational single LLM round |
+| behavioral split (`classify_by_terminal`, terminal=`execute_tool`) | **Conversational 68.1% / Agentic 31.9%** (tools: web_search 141, calculator 38) |
+| per-archetype baseline | agentic p99 **35061 ms** vs conversational p99 **16350 ms** (~2.3× heavier mean) |
+| arrival | **steady** (interior CoV 0.016; raw full-window 0.166 was a partial-boundary-bin artifact now trimmed by `shaping.trim_partial_bins`) |
+| Little's Law | λ 0.196/s × W 2.282 s = 0.448 ≈ observed 0.448 → ratio **1.0** |
+| code linking | journeys linked to `deploy/agentapp/app/*` (`handle_request`, `TracedLLM.call`, tools) |
+
+**Conclusion-shape matches the astronomy shop with zero code changes** — the §2.1 agnostic-engine
+thesis proven end-to-end on a DeepSeek-backed agent app: Buyer/Browser (order-terminal) and
+Agentic/Conversational (tool-terminal) are the same `classify_by_terminal` engine. A **robustness
+fix** fell out of the real data: partial Grail boundary bins were falsely tripping the CoV ramp
+gate; `trim_partial_bins` now removes them so steady constant-arrival traffic is read as steady.
+
+Artifacts: `loadtests/crewai-deepseek-agent/{workload-model.json,scenario-proposal.md}`.

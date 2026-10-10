@@ -67,6 +67,25 @@ def test_ramp_curve_segments_and_bounds_stages():
     assert "ramp_down" in shapes  # ramp-down tail present
 
 
+def test_partial_boundary_bins_do_not_false_trigger_ramp():
+    # crewai-deepseek-agent live case: steady 12rpm k6 driver with partial first/last bins.
+    # Raw CoV trips the ramp gate; trimmed CoV is steady.
+    curve = [2.0] + [12.0] * 24 + [2.0]
+    assert sh.coefficient_of_variation(curve, trim=False) >= sh.COV_STEADY_MAX  # raw would ramp
+    assert sh.coefficient_of_variation(curve) < sh.COV_STEADY_MAX               # trimmed -> steady
+    stages, cov = sh.shape_ramp(curve)
+    assert stages[0].shape == "steady"
+    assert cov < sh.COV_STEADY_MAX
+
+
+def test_trim_keeps_genuine_ramp():
+    # a real monotone ramp must NOT be flattened by trimming (edges are not partial here)
+    curve = [float(x) for x in range(5, 60)] + [60.0] * 5 + [float(x) for x in range(55, 5, -1)]
+    trimmed = sh.trim_partial_bins(curve)
+    assert len(trimmed) >= len(curve) - 2
+    assert sh.coefficient_of_variation(curve) >= sh.COV_STEADY_MAX  # still a ramp
+
+
 def test_rates_are_per_second():
     curve = [60.0] * 60  # 60 per minute -> 1.0 per second
     stages, _ = sh.shape_ramp(curve)

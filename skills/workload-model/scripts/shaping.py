@@ -76,15 +76,37 @@ def think_time_ms(wrapper_duration_ms: float, server_response_ms: float) -> floa
     return max(0.0, wrapper_duration_ms - server_response_ms)
 
 
-def coefficient_of_variation(per_minute_counts: list[float]) -> float:
-    """CoV = stddev / mean of the per-minute arrival curve."""
-    n = len(per_minute_counts)
+def trim_partial_bins(per_minute_counts: list[float], *, frac: float = 0.5) -> list[float]:
+    """Drop leading/trailing partial-window bins before CoV/ramp analysis.
+
+    Absolute-timestamp binning (Grail `bin(start_time, 1m)`) almost always yields a partial
+    first and last bucket — the window rarely starts/ends on a minute boundary. Those low
+    edge counts inflate stddev and can falsely trip the CoV ramp gate on otherwise-steady
+    traffic (observed live on crewai-deepseek-agent: full-window CoV 0.166 vs interior 0.016).
+    Drop an edge bin when it is below `frac` x the median of the interior.
+    """
+    if len(per_minute_counts) <= 2:
+        return list(per_minute_counts)
+    interior = sorted(per_minute_counts[1:-1])
+    med = interior[len(interior) // 2] if interior else 0.0
+    out = list(per_minute_counts)
+    if med and out[0] < frac * med:
+        out = out[1:]
+    if med and out and out[-1] < frac * med:
+        out = out[:-1]
+    return out
+
+
+def coefficient_of_variation(per_minute_counts: list[float], *, trim: bool = True) -> float:
+    """CoV = stddev / mean of the per-minute arrival curve (partial edge bins trimmed)."""
+    counts = trim_partial_bins(per_minute_counts) if trim else per_minute_counts
+    n = len(counts)
     if n == 0:
         return 0.0
-    mean = sum(per_minute_counts) / n
+    mean = sum(counts) / n
     if mean == 0:
         return 0.0
-    var = sum((c - mean) ** 2 for c in per_minute_counts) / n
+    var = sum((c - mean) ** 2 for c in counts) / n
     return math.sqrt(var) / mean
 
 
@@ -116,7 +138,8 @@ def shape_ramp(
                         The ramp-down tail is always present.
     Rates are per-second (counts are per-minute -> divide by 60).
     """
-    cov = coefficient_of_variation(per_minute_counts)
+    per_minute_counts = trim_partial_bins(per_minute_counts)
+    cov = coefficient_of_variation(per_minute_counts, trim=False)
     n = len(per_minute_counts)
     if n == 0:
         return [], 0.0
