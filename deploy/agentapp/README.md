@@ -35,16 +35,18 @@ deterministically here.
    committed) — full admin *within* `agentapp`, namespace create/reconcile for `agentapp`, and
    read of `otel-demo/dt-otlp-token` for §3. `kubectl auth can-i create deploy -n agentapp` → yes.
    Point `KUBECONFIG` at that file (or the admin fallback `~/.config/capmox/memory-benchmark.kubeconfig`).
-2. **`DEEPSEEK_API_KEY`** — a DeepSeek API key (platform.deepseek.com). Owner-provided via Paperclip
-   `adapterConfig.secretEnv` on [ISI-5645](/ISI/issues/ISI-5645) (paid billing), never commit. **Still pending.**
-3. **DT oat05854 OTLP token** — *not a new secret*: the ISI-4089 `dt-otlp-token` is **currently
-   absent** from namespace `otel-demo` on this cluster, so §3's copy-across-namespace is a no-op —
-   mint it (see `secret.example.yaml`) or restore the ISI-4089 token. The deploy credential is
-   already pre-authorized to read it from `otel-demo` once present.
+2. **`DEEPSEEK_API_KEY`** — ✅ **RESOLVED (ISI-5645)**. Owner-provided (paid billing). The company
+   Secrets API is board-gated for agents, so it was delivered the same agent-doable way as the
+   kubeconfig: a gitignored, mode-600 env file on the runner at
+   **`~/.config/capmox/agentapp-deepseek.env`** (`export DEEPSEEK_API_KEY=…`, never committed).
+   Validated against the live API — auth `HTTP 200`, and the app's default model `deepseek-chat`
+   resolves `200`. **`source` that file** before §3 so `$DEEPSEEK_API_KEY` is set.
+3. **DT oat05854 OTLP token** — ✅ **RESOLVED (ISI-5647)**. The ISI-4089 `dt-otlp-token` had gone
+   absent from `otel-demo`; it was recovered from the runner's secure store and restored, so §3's
+   copy-across-namespace works again. The deploy credential is pre-authorized to read it.
 
-Container build also needs a registry the cluster can pull from (`REGISTRY` below). So the one
-remaining owner-provided blocker is **the DeepSeek API key** (ISI-5645); the kubeconfig is done
-and the DT token is an in-cluster mint.
+Container build also needs a registry the cluster can pull from (`REGISTRY` below). **All three
+owner-provided blockers are now resolved** — this runbook is ready to execute end-to-end.
 
 ---
 
@@ -72,7 +74,8 @@ sed -i "s#REGISTRY/crewai-deepseek-agent:0.1.0#$REGISTRY/crewai-deepseek-agent:0
 ```sh
 kubectl apply -f deploy/agentapp/k8s/namespace.yaml
 
-# DeepSeek key (the one true new secret — owner-provided via Paperclip secretEnv):
+# DeepSeek key (owner-provided; delivered to the runner store on ISI-5645):
+source ~/.config/capmox/agentapp-deepseek.env   # sets $DEEPSEEK_API_KEY (mode-600, gitignored)
 kubectl -n agentapp create secret generic deepseek-api \
   --from-literal=apiKey="$DEEPSEEK_API_KEY"
 
