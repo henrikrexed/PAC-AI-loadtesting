@@ -88,3 +88,24 @@ Grail). To show the agent's real output I invoked the live pod (`POST /request`)
 These map 1:1 to the model's two archetypes: a chat turn = **Conversational**, a tool turn =
 **Agentic (ReAct)**. The agent generates correct results; the workload model captures the two
 behaviors at their true 68/32 mix.
+
+## Live otel-demo state check (2026-10-11) — purchase backend down
+
+Board asked whether to investigate the otel-demo instead. The otel-demo was in fact the skill's
+**first/primary target** (`loadtests/otel-astronomy-frontend/`, Buyer/Browser). Re-running the
+investigation live today (-3h, oat05854) surfaced a current-state finding: the astronomy-shop's
+**purchase backend is down** while the browse path is healthy:
+
+| service | spans (-3h) | | service | spans (-3h) |
+|---|---|---|---|---|
+| frontend | 9016 | | checkout | **0** |
+| frontend-proxy | 4722 | | payment | **1** |
+| product-catalog | 2394 | | cart | **0** |
+| ad | 1167 | | shipping/currency/email/quote | **0** |
+| recommendation | 639 | | | |
+
+`user_checkout_*` roots still fire but their traces now reach only `load-generator` (reach ~2.3
+vs the healthy reach-12). A fresh otel-demo run today therefore yields **100% Browser / 0% Buyer**
+— the skill faithfully reporting that no purchases complete (it detects a dark business path).
+The committed otel-demo model captures the healthy-state Buyer/Browser scenarios; a fresh live
+Buyer run needs the checkout/cart/payment pods restored first (astronomy-shop app/infra, ProxOps).
