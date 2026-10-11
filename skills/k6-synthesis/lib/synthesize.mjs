@@ -2,7 +2,7 @@
 // then run the V2a static checker. This is the SYNTHESIZE skill boundary (§3.3,
 // §8 row 3): model->k6 codegen, payload-pool generation, G2 chain, V2a.
 
-import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadModel, assertApproved, poolKinds } from './model.mjs';
@@ -32,26 +32,28 @@ function poolContext(model, poolId) {
 }
 
 /**
- * Run the full synthesis. Returns { model, scriptPath, outDir, pools, v2a, warnings }.
- * Throws on the V1 gate (unapproved model) before writing anything.
+ * Build all k6 artifacts IN MEMORY from an approved model — deterministic, no
+ * network, no disk writes. This is the pure core that both `synthesize()` (which
+ * writes + runs V2a) and the formal Renderer adapter (`lib/renderer.mjs`, §4.3)
+ * share, so the on-disk layout and the renderer `files[]` never drift.
+ *
+ * Returns { pools, options, maxRate, warnings, files } where `files` is an array
+ * of { path, content } with paths RELATIVE to an outDir:
+ *   payloads/<id>.json, k6/<name>.js, k6/lib/<helper>.js
  */
-export function synthesize(modelPathOrObj, outDir, { ttlSec } = {}) {
-  const model = loadModel(modelPathOrObj);
-  assertApproved(model); // V1 gate — refuse unapproved models
-
+export function buildArtifacts(model, { ttlSec } = {}) {
   const kinds = poolKinds(model);
   const warnings = [];
+  const files = [];
 
-  // 1. generate payload pools
+  // 1. payload pools
   const pools = {};
-  const payloadsDir = path.join(outDir, 'payloads');
-  mkdirSync(payloadsDir, { recursive: true });
   for (const [id, pspec] of Object.entries((model.spec && model.spec.payloads) || {})) {
     const ctx = poolContext(model, id);
     if (ttlSec) ctx.ttlSec = ttlSec;
     const pool = generatePool(id, pspec, ctx);
     pools[id] = pool;
-    writeFileSync(path.join(payloadsDir, `${id}.json`), JSON.stringify(pool, null, 2) + '\n');
+    files.push({ path: path.posix.join('payloads', `${id}.json`), content: JSON.stringify(pool, null, 2) + '\n' });
     if (pool.cacheProfile && pool.cacheProfile.withinTolerance === false) {
       warnings.push(
         `pool "${id}": achieved hit ratio ${pool.cacheProfile.achievedHitRatio} outside tolerance of target ${pool.cacheProfile.targetHitRatio}` +
@@ -60,17 +62,36 @@ export function synthesize(modelPathOrObj, outDir, { ttlSec } = {}) {
     }
   }
 
-  // 2. generate the k6 script
+  // 2. k6 script + runtime helpers
   const { source, options, maxRate, warnings: cgWarn } = generateScript(model, kinds);
   warnings.push(...cgWarn);
-  const k6Dir = path.join(outDir, 'k6');
-  const libDir = path.join(k6Dir, 'lib');
-  mkdirSync(libDir, { recursive: true });
-  for (const h of RUNTIME_HELPERS) cpSync(path.join(RUNTIME_DIR, h), path.join(libDir, h));
-  const scriptPath = path.join(k6Dir, `${model.metadata.name}.js`);
-  writeFileSync(scriptPath, source);
+  files.push({ path: path.posix.join('k6', `${model.metadata.name}.js`), content: source });
+  for (const h of RUNTIME_HELPERS) {
+    files.push({ path: path.posix.join('k6', 'lib', h), content: readFileSync(path.join(RUNTIME_DIR, h), 'utf8') });
+  }
 
-  // 3. V2a static check
+  return { pools, options, maxRate, warnings, files, source };
+}
+
+/**
+ * Run the full synthesis. Returns { model, scriptPath, outDir, pools, v2a, warnings }.
+ * Throws on the V1 gate (unapproved model) before writing anything.
+ */
+export function synthesize(modelPathOrObj, outDir, { ttlSec } = {}) {
+  const model = loadModel(modelPathOrObj);
+  assertApproved(model); // V1 gate — refuse unapproved models
+
+  const { pools, options, maxRate, warnings, files, source } = buildArtifacts(model, { ttlSec });
+
+  // write every artifact to disk, preserving the relative layout
+  for (const f of files) {
+    const abs = path.join(outDir, f.path);
+    mkdirSync(path.dirname(abs), { recursive: true });
+    writeFileSync(abs, f.content);
+  }
+  const scriptPath = path.join(outDir, 'k6', `${model.metadata.name}.js`);
+
+  // V2a static check (reads the just-written files on disk)
   const v2a = v2aCheck({ model, source, scriptPath, outDir, options, maxRate });
 
   return { model, scriptPath, outDir, pools, options, maxRate, v2a, warnings };

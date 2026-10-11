@@ -437,6 +437,17 @@ Draft-07 JSON Schema, **v0.3**. Stored as `loadtests/<target>/workload-model.jso
                     "callType": { "enum": ["http", "grpc", "db", "mq", "cache"] },
                     "codeRef": { "type": "string" },
                     "payloadRef": { "type": "string", "description": "key into spec.payloads" },
+                    "request": {
+                      "type": "object",
+                      "description": "§4 v1.1 G-R1 (additive, optional): structured request so a renderer need not string-parse `operation`",
+                      "properties": {
+                        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
+                        "pathTemplate": { "type": "string" },
+                        "queryParams": { "type": "object", "additionalProperties": { "type": "string" } },
+                        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+                        "bodyPayloadRef": { "type": "string" }
+                      }
+                    },
                     "thinkTime": { "$ref": "#/definitions/thinkTime" },
                     "dependsOn": { "type": "array", "items": { "type": "string" } },
                     "correlates": {
@@ -547,7 +558,16 @@ Draft-07 JSON Schema, **v0.3**. Stored as `loadtests/<target>/workload-model.jso
               "generator": { "type": "string", "examples": ["random", "sequence", "faker:firstName", "const"] },
               "values": { "type": "array" },
               "distribution": { "enum": ["uniform", "weighted", "normal", "zipf"] },
-              "optional": { "type": "boolean", "default": false }
+              "optional": { "type": "boolean", "default": false },
+              "target": {
+                "type": "object",
+                "description": "§4 v1.1 G-P1 (additive, optional): request-location binding (mirrors correlates.inject)",
+                "required": ["into"],
+                "properties": {
+                  "into": { "enum": ["body_field", "query_param", "path_param", "header"] },
+                  "as": { "type": "string" }
+                }
+              }
             }
           }
         },
@@ -570,11 +590,11 @@ Draft-07 JSON Schema, **v0.3**. Stored as `loadtests/<target>/workload-model.jso
 
 **Open schema questions (for Phase 3 / first real use):** multi-service journeys spanning Kafka topics; empirical think-time ergonomics; whether `caps` belongs in the model or only in `run-config.json` (current answer: model declares, run-config enforces).
 
-**§4 v1.1 — additive renderer-completeness bump** (scheduled from research spike [ISI-5634](/ISI/issues/ISI-5634) §4.2; all additive/optional, no structural change — keeps existing models valid):
+**§4 v1.1 — additive renderer-completeness bump** (scheduled from research spike [ISI-5634](/ISI/issues/ISI-5634) §4.2; **landed in [ISI-5655](/ISI/issues/ISI-5655)** — fields are present in `skills/workload-model/scripts/schema.json`; all additive/optional, no structural change — a pre-v1.1 model still validates):
 
-- **G-R1** (`steps[].request`, optional) — structured `{ method, pathTemplate, queryParams, headers, bodyPayloadRef }` so a generic renderer need not string-parse `steps[].operation` (`"POST /api/cart"`). k6-synthesis already parses the string; structuring de-risks the non-k6 renderers.
-- **G-P1** (`payloads[].fields[].target`, optional) — `{ into: body_field|query_param|path_param|header, as: <name> }` (mirrors `correlates.inject`), so a field's request-location is explicit rather than "assumed body".
-- **G-D1** (doc) — a ramping stage ramps *from the previous stage's end rate* (first ramping stage starts at 0); `stages[].rate` is iterations/s when `model=open`, VUs when `closed`; `shape` is authoritative for ramp_up/plateau/steady/ramp_down.
+- **G-R1** (`steps[].request`, optional) — structured `{ method, pathTemplate, queryParams, headers, bodyPayloadRef }` so a generic renderer need not string-parse `steps[].operation` (`"POST /api/cart"`). k6-synthesis already parses the string; structuring de-risks the non-k6 renderers. Renderers read it via `renderer-kit` `resolveRequest(step)` (falls back to parsing `operation`).
+- **G-P1** (`payloads[].fields[].target`, optional) — `{ into: body_field|query_param|path_param|header, as: <name> }` (mirrors `correlates.inject`), so a field's request-location is explicit rather than "assumed body". Renderers read it via `renderer-kit` `resolveFieldTarget(field)` (falls back to `body_field` under the field name).
+- **G-D1** (doc convention — ramp-start) — a ramping stage ramps *from the previous stage's end rate*; the **first** ramping stage starts at **0**; `stages[].rate` is the *target* iterations/s when `arrivalProfile.model=open`, or the *target* concurrent VUs when `closed`; `stages[].shape` (`ramp_up`/`plateau`/`steady`/`ramp_down`) is **authoritative** for how a renderer interprets the transition into each stage. A `ramp_down` must reach 0 (renderers synthesize a terminal ramp-down to 0 if the model omits it).
 - **Per-renderer capability notes** (not schema): `empirical` think-time and `body_html` extraction have no native construct in JMeter/Gatling/Locust (each documents its approximation — JSR223 timer / Boundary extractor / custom pause); open-arrival→Locust requires a `LoadTestShape`+pacing approximation; non-http `callType` (grpc/db/mq/cache) steps are topology/baseline only, not directly driven (driving them needs a per-renderer protocol plugin, out of thin-slice scope).
 
 ---

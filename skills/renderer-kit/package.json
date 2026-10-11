@@ -1,0 +1,13 @@
+{
+  "name": "renderer-kit",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Renderer foundation (ISI-5655): the formal Renderer interface + tool registry + shared acceptance harness that k6/jmeter/locust/gatling renderers conform to. Pure functions over an approved §4 workload-model.json.",
+  "exports": {
+    ".": "./lib/index.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

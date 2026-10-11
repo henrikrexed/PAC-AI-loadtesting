@@ -63,6 +63,25 @@ loop, emit into `loadtests/<target>/` so the layout matches §5.1.
   promotes `synthetic` to a queryable span attribute. Backend span visibility is
   asserted at EXECUTE/G5 (loadtest-run), not here.
 
+## Renderer-interface conformance (ISI-5655)
+
+k6 is the reference renderer for the formal `Renderer` interface in
+`skills/renderer-kit` (research §4.3). `lib/renderer.mjs` exports `k6Renderer`
+(`name:"k6"`, `targetTool:"Grafana k6"`, `schemaRange:">=1.0 <2.0"`) with:
+
+- **`supports(model)`** — capability report; k6 natively honors every §4 construct,
+  so a well-formed model yields `ok:true` (the only caveat surfaced is G-X1:
+  non-http steps are topology/baseline, not directly driven).
+- **`render(model, opts)`** — deterministic, network-free, returns
+  `{ files:[{path,content}], warnings:[] }`. It shares `buildArtifacts()` with
+  `synthesize()`, so `render()`'s files are byte-identical to what `synthesize()`
+  writes to disk. `render()` still enforces the V1 approval gate (fail-closed).
+  The V2a static gate stays in `synthesize()` (it inspects files on disk / parses
+  with `k6 inspect`), not in the pure `render()` surface.
+
+Conformance is pinned by `test/renderer.test.mjs` via the shared
+`assertRendererConformance()` harness.
+
 ## V2a checks (§3.3 exit criteria)
 
 1. script parses (`k6 inspect` when present, else `node --check`)

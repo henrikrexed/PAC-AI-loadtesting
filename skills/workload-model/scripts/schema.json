@@ -99,6 +99,17 @@
                     "callType": { "enum": ["http", "grpc", "db", "mq", "cache"] },
                     "codeRef": { "type": "string" },
                     "payloadRef": { "type": "string", "description": "key into spec.payloads" },
+                    "request": {
+                      "type": "object",
+                      "description": "§4 v1.1 G-R1 (additive, optional): structured request so a renderer need not string-parse `operation`. When absent, renderers parse `operation` (\"POST /api/cart\").",
+                      "properties": {
+                        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
+                        "pathTemplate": { "type": "string", "description": "path with {param} placeholders, e.g. /api/products/{id}" },
+                        "queryParams": { "type": "object", "additionalProperties": { "type": "string" } },
+                        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
+                        "bodyPayloadRef": { "type": "string", "description": "key into spec.payloads for the request body (defaults to payloadRef)" }
+                      }
+                    },
                     "evidenceSource": { "enum": ["span", "accesslog", "both"] },
                     "spanless": { "type": "boolean", "default": false },
                     "thinkTime": { "$ref": "#/definitions/thinkTime" },
@@ -211,7 +222,16 @@
               "generator": { "type": "string", "examples": ["random", "sequence", "faker:firstName", "const"] },
               "values": { "type": "array" },
               "distribution": { "enum": ["uniform", "weighted", "normal", "zipf"] },
-              "optional": { "type": "boolean", "default": false }
+              "optional": { "type": "boolean", "default": false },
+              "target": {
+                "type": "object",
+                "description": "§4 v1.1 G-P1 (additive, optional): request-location binding (mirrors correlates.inject). When absent, the field is assumed to go into the request body under its own name.",
+                "required": ["into"],
+                "properties": {
+                  "into": { "enum": ["body_field", "query_param", "path_param", "header"] },
+                  "as": { "type": "string", "description": "destination name (defaults to the field name)" }
+                }
+              }
             }
           }
         },
