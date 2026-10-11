@@ -61,10 +61,14 @@ Per board direction ([ISI-5622](/ISI/issues/ISI-5622), 2026-10-09), the solution
 
 3. **Output renderers (tool-specific).** A renderer turns `workload-model.json` into runnable scripts for the user's chosen tool — **k6 first for our pod**, with the same model renderable to JMeter, Locust, Gatling, etc. behind a common renderer interface. Swapping tools = swapping a renderer; the model and engine are untouched.
 
-```
-backend        →  [input adapter]      →  neutral telemetry   →  [WORKLOAD-MODEL ENGINE]  →  workload-model.json  →  [renderer]       →  k6 | JMeter | Locust | Gatling
-(Dynatrace,        (backend-specific)      (interchange schema)   (agnostic utility)          (§4 schema)             (tool-specific)
- Istio logs, …)
+```mermaid
+flowchart LR
+    BK["backend<br/>Dynatrace · Istio logs · …"] -->|pull| AD["input adapter<br/>backend-specific"]
+    AD -->|normalize| NT["neutral telemetry<br/>interchange schema"]
+    NT --> ENG["WORKLOAD-MODEL ENGINE<br/>agnostic utility"]
+    ENG --> WM["workload-model.json<br/>§4 schema"]
+    WM --> RD["renderer<br/>tool-specific"]
+    RD --> OUT["k6 · JMeter · Locust · Gatling"]
 ```
 
 Two contracts make the layers independently buildable and the engine independently testable against recorded fixtures: the **neutral telemetry interchange schema** (adapter → engine) and the existing **§4 workload-model schema** (engine → renderer).
