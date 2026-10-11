@@ -1,0 +1,13 @@
+{
+  "name": "locust-synthesis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Locust renderer (ISI-5657): approved §4 workload-model.json -> locustfile.py + lib helpers + pre-generated feeders. Conforms to the ISI-5655 Renderer interface; declares Locust's open-arrival (G-O1) + empirical think-time approximations in supports(); emits synthetic=true on every request.",
+  "exports": {
+    ".": "./lib/index.mjs"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

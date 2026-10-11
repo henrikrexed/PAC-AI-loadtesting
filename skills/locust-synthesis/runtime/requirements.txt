@@ -1,0 +1,9 @@
+# Locust renderer runtime deps (ISI-5657). Install with:
+#   pip install -r requirements.txt
+locust>=2.20
+
+# Optional — only needed for OTel client-span emission (synthetic.instrument_otel()).
+# Baggage synthetic=true rides the request header regardless; these add client spans.
+# opentelemetry-sdk>=1.24
+# opentelemetry-exporter-otlp>=1.24
+# opentelemetry-instrumentation-requests>=0.45b0

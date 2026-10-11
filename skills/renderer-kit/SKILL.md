@@ -60,9 +60,9 @@ All additive/optional — **a pre-v1.1 model still validates** (see
 | Tool | Renderer | Status |
 |---|---|---|
 | k6 | `skills/k6-synthesis` (`lib/renderer.mjs` → `k6Renderer`) | **conforms** (ISI-5631 retrofit) |
-| Locust | `lib/renderers/locust-stub.mjs` | **stub** — real renderer = ISI-5657 |
+| Gatling | `skills/gatling-synthesis` (`lib/renderer.mjs` → `gatlingRenderer`) | **conforms** (ISI-5658) |
+| Locust | `skills/locust-synthesis` (`lib/renderer.mjs` → `locustRenderer`) | **conforms** (ISI-5657; supersedes `locust-stub`) |
 | JMeter | — | ISI-5656 |
-| Gatling | — | ISI-5658 |
 
 ## Authoring a new renderer
 
