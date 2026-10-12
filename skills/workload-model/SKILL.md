@@ -72,8 +72,8 @@ deterministic path. **dtctl carries SCOPE; the skill owns the query pack, algori
      then reconcile per request/endpoint key: **common** (in RUM and spans) → RUM user session is
      primary, extrapolated by `factor = span_rate / rum_rate` (the unsampled span side calibrates
      RUM's sampling — no sampling-rate config needed); **span-only** (no RUM match) → span-order
-     HTTP scenario; **rum-only** → RUM as-is. Grail-native: no classic-token dependency (legacy
-     Path A = RUM via USQL
+     HTTP scenario; **rum-only** (no server span) → **dropped** (nothing to drive server-side).
+     Grail-native: no classic-token dependency (legacy Path A = RUM via USQL
      stays board-gated, ISI-5691 NO-GO on Grail-only RUM). App-agnostic — works for non-browser
      apps too (validated on an A2A agent). Coverage % is recorded on `source.sessionIdCoverage`
      next to the sampling ratio; where `session.id` is absent, tiers 2a/2b are the unchanged

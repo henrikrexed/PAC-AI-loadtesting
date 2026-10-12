@@ -21,8 +21,9 @@ Merge rules (one per key):
     RUM effective sampling (no separate sampling-rate config needed) and corrects for it.
   * **span-only (no RUM match)** → `source="span"`: generate an HTTP span-order scenario
     (tiers 2a/2b) — backend/internal calls and non-browser apps the RUM agent never sees.
-  * **rum-only (in RUM, not spans)** → `source="rum"`, `factor=1.0`, flagged: pure client-side
-    activity with no server span (rare); kept as-is, cannot be span-extrapolated.
+  * **rum-only (in RUM, not spans)** → **DROPPED** (board decision, ISI-5693 2026-10-12): a key
+    with no server span has nothing to drive server-side, so it is not modelled. The count of
+    dropped keys is reported in the summary for auditability, but no entry is emitted.
 
 Open dependency: the authoritative per-endpoint RUM rates come from `user.events`, which is
 gated on OAuth scope `storage:user.events:read` (403 today). Until then the reconciler runs on
@@ -71,11 +72,7 @@ def reconcile(rum_rates: dict[str, float], span_rates: dict[str, float]) -> list
                 key, "span", None, round(s, 6), None,
                 "no RUM match → span-order HTTP scenario (tiers 2a/2b).",
             ))
-        else:  # r only
-            entries.append(MergeEntry(
-                key, "rum", round(r, 6), None, 1.0,
-                "RUM-only (client-side, no server span) → RUM as-is; not span-extrapolatable.",
-            ))
+        # else: rum-only (no server span) → DROPPED (board decision); not modelled.
     entries.sort(key=lambda e: _effective_rate(e), reverse=True)
     return entries
 
@@ -93,8 +90,8 @@ def merge_plan(rum_rates: dict[str, float], span_rates: dict[str, float]) -> dic
     entries = reconcile(rum_rates, span_rates)
     rum_primary = [e for e in entries if e.source == "rum"]
     span_fallback = [e for e in entries if e.source == "span"]
-    common = [e for e in rum_primary if e.extrapolationFactor is not None and e.spanRate is not None]
-    factors = [e.extrapolationFactor for e in common if e.extrapolationFactor]
+    factors = [e.extrapolationFactor for e in rum_primary if e.extrapolationFactor]
+    dropped_rum_only = sorted(set(rum_rates) - set(span_rates))
     total_rate = sum(_effective_rate(e) for e in entries) or 1.0
     rum_rate = sum(_effective_rate(e) for e in rum_primary)
     return {
@@ -103,7 +100,7 @@ def merge_plan(rum_rates: dict[str, float], span_rates: dict[str, float]) -> dic
             "keys": len(entries),
             "rumPrimaryKeys": len(rum_primary),
             "spanFallbackKeys": len(span_fallback),
-            "commonKeys": len(common),
+            "droppedRumOnlyKeys": len(dropped_rum_only),  # board: rum-only is dropped, not modelled
             "rumDrivenShare": round(rum_rate / total_rate, 4),
             "meanExtrapolationFactor": round(statistics.mean(factors), 4) if factors else None,
             "extrapolationFactorRange": [round(min(factors), 4), round(max(factors), 4)] if factors else None,

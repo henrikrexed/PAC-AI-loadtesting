@@ -26,11 +26,10 @@ def test_span_only_key_is_http_scenario():
     assert "span-order HTTP scenario" in e.rationale
 
 
-def test_rum_only_key_kept_as_is_and_flagged():
-    (e,) = sm.reconcile({"client route-change": 3.0}, {})
-    assert e.source == "rum"
-    assert e.extrapolationFactor == 1.0
-    assert "RUM-only" in e.rationale
+def test_rum_only_key_is_dropped():
+    # board decision (ISI-5693): a RUM key with no server span is NOT modelled
+    entries = sm.reconcile({"client route-change": 3.0}, {})
+    assert entries == []
 
 
 def test_entries_sorted_by_effective_driven_rate_desc():
@@ -42,16 +41,17 @@ def test_entries_sorted_by_effective_driven_rate_desc():
     assert [e.key for e in entries] == ["a", "c", "b"]
 
 
-def test_merge_plan_summary_math():
+def test_merge_plan_summary_math_and_dropped_rum_only():
     plan = sm.merge_plan(
-        {"a": 2.0, "b": 4.0},            # RUM common with a,b
-        {"a": 8.0, "b": 8.0, "back": 10.0},  # spans add a backend-only key
+        {"a": 2.0, "b": 4.0, "clientX": 1.0},  # clientX is rum-only -> dropped
+        {"a": 8.0, "b": 8.0, "back": 10.0},    # spans add a backend-only key
     )
     s = plan["summary"]
-    assert s["keys"] == 3
+    assert s["keys"] == 3            # a, b, back (clientX dropped, not emitted)
     assert s["rumPrimaryKeys"] == 2
     assert s["spanFallbackKeys"] == 1
-    assert s["commonKeys"] == 2
+    assert s["droppedRumOnlyKeys"] == 1
+    assert all(e["key"] != "clientX" for e in plan["entries"])
     # extrapolation factors: a=4.0, b=2.0 → mean 3.0, range [2,4]
     assert s["meanExtrapolationFactor"] == 3.0
     assert s["extrapolationFactorRange"] == [2.0, 4.0]

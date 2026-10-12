@@ -230,7 +230,7 @@ reconciler (`reconcile()` / `merge_plan()`), pure and tested.
 |---|---|---|---|
 | **common** (in RUM *and* spans) | **RUM** user session (ordered journey + think-times) | `rum_rate × factor`, `factor = span_rate / rum_rate` | RUM is the session-accurate signal; the span side is **unsampled** here (`dt.system.sampling_ratio=1.0`), so the overlap ratio *measures* RUM's effective sampling and extrapolates the RUM-primary journey up to the real volume — no separate sampling-rate config needed |
 | **span-only** (no RUM match) | **span** HTTP scenario (tiers 2a/2b) | span_rate | backend/internal gRPC + non-browser apps the RUM agent never sees (unguard, image-provider, A2A, cron) |
-| **rum-only** (RUM, no server span) | RUM as-is (factor 1.0, flagged) | rum_rate | pure client-side activity; not span-extrapolatable |
+| **rum-only** (RUM, no server span) | **DROPPED** — not modelled | — | board decision (2026-10-12): no server span ⇒ nothing to drive server-side; dropped-key count is reported in the summary for audit, no entry emitted |
 
 **Self-calibrating sampling.** No RUM sampling-rate metric is exposed on this token
 (`dt.sfm.*rum*` has only `total_sessions`), so a configured rate is unavailable — but the merge
