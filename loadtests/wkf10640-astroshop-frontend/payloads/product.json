@@ -1,0 +1,44 @@
+{
+  "kind": "cache-key",
+  "id": "product",
+  "seed": 42,
+  "pii": "none (synthetic generated keys)",
+  "cacheProfile": {
+    "targetHitRatio": 0.99,
+    "achievedHitRatio": 1,
+    "tolerance": 0.1,
+    "withinTolerance": true,
+    "clamped": false,
+    "keyCardinality": 10,
+    "distribution": "zipf",
+    "distributionAlpha": 0.05,
+    "window": 2604,
+    "rate": 43.4,
+    "ttlSec": 60,
+    "backingStoreSeeded": true
+  },
+  "keys": [
+    "productId-000001",
+    "productId-000002",
+    "productId-000003",
+    "productId-000004",
+    "productId-000005",
+    "productId-000006",
+    "productId-000007",
+    "productId-000008",
+    "productId-000009",
+    "productId-000010"
+  ],
+  "cdf": [
+    0.1077788696304862,
+    0.21188639529702757,
+    0.3139045730089908,
+    0.4144658141647789,
+    0.5139113115466661,
+    0.6124543756093623,
+    0.7102408351791776,
+    0.8073765912933256,
+    0.9039419813308344,
+    1
+  ]
+}

@@ -1,0 +1,74 @@
+{
+  "tool": "jmeter",
+  "generatedBy": "jmeter-synthesis (ISI-5656)",
+  "model": {
+    "name": "otel-astroshop-frontend-wkf10640",
+    "revision": 3,
+    "targetService": "frontend"
+  },
+  "synthetic": {
+    "header": "baggage",
+    "value": "synthetic=true",
+    "note": "stamped on every request via the test-plan Header Manager"
+  },
+  "otel": {
+    "note": "W3C trace-context + span export requires the JMeter OpenTelemetry listener plugin at EXECUTE; baggage synthetic=true is carried natively here."
+  },
+  "executor": "Concurrency Thread Group + Throughput Shaping Timer (open model)",
+  "load": {
+    "maxRate": 43.4,
+    "totalThreads": 6,
+    "caps": {
+      "maxRps": 60,
+      "maxVus": 50,
+      "maxDuration": "45m"
+    }
+  },
+  "datasets": [
+    {
+      "id": "product",
+      "kind": "cache-key",
+      "file": "data/product.csv",
+      "variables": [
+        "product__productId"
+      ],
+      "keyField": "productId",
+      "sampleRows": 8000,
+      "cacheProfile": {
+        "targetHitRatio": 0.99,
+        "achievedHitRatio": 1,
+        "tolerance": 0.1,
+        "withinTolerance": true,
+        "clamped": false,
+        "keyCardinality": 10,
+        "distribution": "zipf",
+        "distributionAlpha": 0.05,
+        "window": 2604,
+        "rate": 43.4,
+        "ttlSec": 60,
+        "backingStoreSeeded": true,
+        "achievedHitRatioSampled": 1
+      }
+    },
+    {
+      "id": "checkout",
+      "kind": "record",
+      "file": "data/checkout.csv",
+      "variables": [
+        "checkout__email",
+        "checkout__creditCardNumber",
+        "checkout__currencyCode"
+      ],
+      "recordCount": 100,
+      "pii": "none (PII-free generators; emails on @synthetic.invalid)"
+    }
+  ],
+  "capability": {
+    "ok": true,
+    "unsupported": []
+  },
+  "plugins": [
+    "jp@gc - Concurrency Thread Group",
+    "jp@gc - Throughput Shaping Timer"
+  ]
+}

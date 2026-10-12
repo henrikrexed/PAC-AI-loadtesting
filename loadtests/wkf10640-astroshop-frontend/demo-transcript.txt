@@ -1,0 +1,52 @@
+
+==================== STEP 1 — telemetry -> model (pre-baked, no re-extraction) ====================
+model:  otel-astroshop-frontend-wkf10640 rev 3
+source: DQL spans + RUM sessions (samplingRatio=1.0, evidence=span); RUM->span factor 1.2735
+  journey browser  weight=0.9908 entry=GET /
+  journey buyer    weight=0.0092 entry=GET /api/products?currencyCode=USD
+  Little's Law: expected 3.6755 ~ observed 3.6776 -> ratio 0.9994
+
+==================== STEP 2 — model -> k6 ====================
+model:   otel-astroshop-frontend-wkf10640 rev 3
+script:  /mnt/nas/projects/PAC-AI-Loadtest/loadtests/wkf10640-astroshop-frontend/k6/otel-astroshop-frontend-wkf10640.js
+pools:   product, checkout
+  product: cache-key K=10 zipf-alpha=0.05 hit=1 (target 0.99)
+warnings:
+  - ramp-down stage synthesized for scenario "browser" (model ended above zero)
+  - ramp-down stage synthesized for scenario "buyer" (model ended above zero)
+
+V2a: PASS
+  [x] script parses (node --check) — node --check OK
+  [x] every request carries baggage synthetic=true — all requests route through syntheticParams() (baggage synthetic=true)
+  [x] referenced payload pools exist and match specs — 2 pools OK
+  [x] declared max rate/VU <= caps — within caps
+  [x] dependsOn steps extract + fail-fast on null — all chains guarded
+  [x] ramping scenarios end with ramp-down to 0 — ramp-down present
+  [x] scripts + helpers present on disk — 6 files present
+
+==================== STEP 3 — model -> JMeter ====================
+jmeter-synthesis: wrote 4 file(s) to /mnt/nas/projects/PAC-AI-Loadtest/loadtests/wkf10640-astroshop-frontend
+  jmeter/otel-astroshop-frontend-wkf10640.jmx
+  jmeter/data/product.csv
+  jmeter/data/checkout.csv
+  jmeter/otel-astroshop-frontend-wkf10640.manifest.json
+  warning: jmeter: ramp-down synthesized for journey "browser" (model ended above zero)
+  warning: jmeter: ramp-down synthesized for journey "buyer" (model ended above zero)
+
+static check: PASS
+  [ok] J1 .jmx is well-formed XML — well-formed, tags balanced
+  [ok] J2 <hashTree> balance — open=13 close=13 selfClosing=12
+  [ok] J3 TestPlan + thread group + HTTP sampler present — TestPlan=true threadGroup=true samplers=9
+  [ok] J4 synthetic=true stamped on traffic (baggage) — baggage: synthetic=true present
+  [ok] J5 G2 request chaining wired (extractor -> ${var} reference) — 3 correlation(s); 0 problem(s)
+  [ok] J6 CSV data sets resolve + are consumed — 2 data set(s) OK
+  [ok] J7 declared load within caps — maxRate=43.4 threads=6
+
+==================== STEP 4 — diff: same model, two tools ====================
+k6     : ramping-arrival-rate executor + syntheticParams() baggage=synthetic=true
+ramping-arrival-rate
+JMeter : Concurrency Thread Group + Throughput Shaping Timer + Header Manager baggage=synthetic=true
+ConcurrencyThreadGroup
+VariableThroughputTimer
+
+See DEMO-DIFF.md for the full comparison table. Guns. Lots of guns.

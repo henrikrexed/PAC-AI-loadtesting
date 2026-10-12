@@ -356,6 +356,13 @@
   },
   "status": {
     "revision": 3,
-    "hash": "sha256:cdd5294c0c0dd008394623b6eef41a4fea8641cfbbf64604714e6a6c1d9639e3"
+    "hash": "sha256:cdd5294c0c0dd008394623b6eef41a4fea8641cfbbf64604714e6a6c1d9639e3",
+    "approval": {
+      "decision": "approved",
+      "revision": 3,
+      "decisionBy": "board (ISI-5684 VALIDATE / G0 12/12, astroshop frontend)",
+      "decisionAt": "2026-10-12T00:00:00Z",
+      "note": "V1 human gate bound to model revision 3 (sha256:cdd5294…9639e3). Pre-baked PAC-talk demo model (ISI-5720/ISI-5723); non-production, extraction-only, tenant wkf10640 isolated per methodology §7.1. No live re-extraction on stage."
+    }
   }
 }
