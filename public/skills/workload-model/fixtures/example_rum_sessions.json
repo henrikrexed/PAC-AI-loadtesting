@@ -1,0 +1,67 @@
+{
+  "_comment": "SYNTHETIC example of a Grail-native `user.sessions` per-app coverage extraction. All app names and numbers are invented; no real RUM/customer data.",
+  "object": "user.sessions (Grail-native RUM; user.events needs OAuth scope storage:user.events:read)",
+  "totalRumSessions24h": 24000,
+  "per_app": [
+    {
+      "app": "storefront-web",
+      "type": "web",
+      "sessions": 12000,
+      "actionsP50": 8,
+      "actionsP99": 11,
+      "durationP50Seconds": 15,
+      "durationP90Seconds": 28,
+      "gapP50Seconds": 2,
+      "bounceRate": 0.001,
+      "errorSessions": 40
+    },
+    {
+      "app": "portal-web",
+      "type": "web",
+      "sessions": 6000,
+      "actionsP50": 6,
+      "actionsP99": 9,
+      "durationP50Seconds": 12,
+      "durationP90Seconds": 22,
+      "gapP50Seconds": 2,
+      "bounceRate": 0.004,
+      "errorSessions": 18
+    },
+    {
+      "app": "trading-web",
+      "type": "web",
+      "sessions": 3000,
+      "actionsP50": 7,
+      "actionsP99": 10,
+      "durationP50Seconds": 14,
+      "durationP90Seconds": 25,
+      "gapP50Seconds": 2,
+      "bounceRate": 0.002,
+      "errorSessions": 9
+    },
+    {
+      "app": "docs-web",
+      "type": "web",
+      "sessions": 1500,
+      "actionsP50": 5,
+      "actionsP99": 8,
+      "durationP50Seconds": 9,
+      "durationP90Seconds": 17,
+      "gapP50Seconds": 2,
+      "bounceRate": 0.008,
+      "errorSessions": 2
+    },
+    {
+      "app": "shopper-mobile",
+      "type": "mobile",
+      "sessions": 1200,
+      "actionsP50": 9,
+      "actionsP99": 13,
+      "durationP50Seconds": 21,
+      "durationP90Seconds": 38,
+      "gapP50Seconds": 2,
+      "bounceRate": 0.001,
+      "errorSessions": 3
+    }
+  ]
+}

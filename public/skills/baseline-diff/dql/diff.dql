@@ -1,0 +1,96 @@
+-- =============================================================================
+-- baseline-diff · ANALYZE DQL pack (methodology §3.5)
+-- Synthetic-filtered shape-diff: synthetic run window vs production baseline.
+-- -----------------------------------------------------------------------------
+-- Field names validated against a live Dynatrace tenant:
+--   request.is_root_span (bool), span.kind (server/client/consumer),
+--   request.is_failed (bool), duration in NANOSECONDS (÷ 1e6 for ms),
+--   start_time (usable ts; `timestamp` is empty on spans),
+--   synthetic == "true"  (STRING, promoted from baggage.synthetic by the
+--     transform/baggage processor — see deploy/otel-demo/pac-lt-collector.yaml;
+--     WITHOUT that promotion this filter matches NOTHING, §3.5 prereq 1).
+--
+-- Bind at run time:
+--   $env   deployment.environment isolating this deployment, e.g. "pac-lt-t0"
+--   $svc   front-end / entry service (from SCOPE front-end discovery)
+--   $op    entry operation (per journey)
+--   TEST window  = the synthetic run window (runs/<ts>)
+--   BASE window  = the production baseline window (deploy/incident-free)
+--
+-- Traffic split within $env:
+--   TEST     : synthetic == "true"      (k6 generated traffic)
+--   BASELINE : isNull(synthetic)        (production / loadgen traffic)
+-- Compare RATES (not raw counts), sampling-corrected, baseline ÷ scalingFactor.
+-- =============================================================================
+
+-- (0) PREREQUISITE PROBE — synthetic tag must be queryable, count MUST be > 0.
+--     Zero means baggage→attribute promotion is missing, NOT that shapes match.
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env
+| summarize syntheticSpans = countIf(synthetic == "true")
+
+-- -----------------------------------------------------------------------------
+-- DIM 1 · ARRIVAL SHAPE — per-minute entry rate curve (test vs baseline).
+--   Read the returned interval: Grail snaps bin width up over long windows.
+-- TEST:
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env and synthetic == "true"
+| filter request.is_root_span == true and service.name == $svc
+| makeTimeseries testPerMin = count(), interval: 1m
+-- BASELINE:
+fetch spans, from: $BASE_FROM, to: $BASE_TO
+| filter deployment.environment == $env and isNull(synthetic)
+| filter request.is_root_span == true and service.name == $svc
+| makeTimeseries basePerMin = count(), interval: 1m
+
+-- -----------------------------------------------------------------------------
+-- DIM 2 · LATENCY — p50/p95/p99 per journey entry op, SERVER span (not the
+--   load-driver wrapper, which bakes in think-time — §3.1 step 5 / G3.2).
+-- TEST (repeat with isNull(synthetic) for BASELINE):
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env and synthetic == "true"
+| filter span.kind == "server" and service.name == $svc and span.name == $op
+| summarize p50 = percentile(duration,50)/1000000.0,
+            p95 = percentile(duration,95)/1000000.0,
+            p99 = percentile(duration,99)/1000000.0
+
+-- -----------------------------------------------------------------------------
+-- DIM 3 · SERVICE FAN-OUT — downstream client edges + per-edge rate.
+--   Edge key = service.name + "->" + span.name (the downstream call).
+-- TEST (repeat with isNull(synthetic) for BASELINE):
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env and synthetic == "true"
+| filter span.kind == "client"
+| summarize calls = count(), by: { service.name, span.name }
+| fieldsAdd edge = concat(service.name, "->", span.name)
+| sort calls desc | limit 200
+
+-- -----------------------------------------------------------------------------
+-- DIM 4 · ERROR RATE — failed fraction per journey (test vs baseline).
+-- TEST (repeat with isNull(synthetic) for BASELINE):
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env and synthetic == "true"
+| filter request.is_root_span == true and service.name == $svc and span.name == $op
+| summarize total = count(), errs = countIf(request.is_failed == true)
+| fieldsAdd errorRate = errs / total
+
+-- -----------------------------------------------------------------------------
+-- DIM 5 · JOURNEY MIX — distribution over journeys in the TEST window; compare
+--   to the approved model weights (spec.journeys[].weight), not to baseline.
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env and synthetic == "true"
+| filter request.is_root_span == true and service.name == $svc
+| summarize observed = count(), by: { span.name }
+| sort observed desc
+
+-- -----------------------------------------------------------------------------
+-- DIM 6 · CACHE HIT RATIO (G4) — only when payload cacheProfile.targetHitRatio
+--   was set. Reproduce production's cache behaviour, don't eliminate caching.
+--   Source depends on how caching is exposed; two common patterns:
+--   (a) cache spans: span.kind == "client" and call to the cache service, with a
+--       hit/miss attribute; (b) a hit-ratio metric. Example (a), adapt per app:
+fetch spans, from: $TEST_FROM, to: $TEST_TO
+| filter deployment.environment == $env and synthetic == "true"
+| filter span.kind == "client" and matchesPhrase(span.name, "cache")
+| summarize hits = countIf(cache.hit == true), total = count(), by: { span.name }
+| fieldsAdd hitRatio = hits / total
