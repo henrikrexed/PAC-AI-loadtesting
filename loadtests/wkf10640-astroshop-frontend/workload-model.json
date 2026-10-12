@@ -80,7 +80,7 @@
     "journeys": [
       {
         "id": "browser",
-        "description": "Browser \u2014 search & browse (no order) - read-only, no order; reconstructed from the trace span-tree; folds entry ops: browser_browse_flow. Think-time between page views is the MEASURED distribution from 5,241 stitched OTel session.id chains on the ad service (Path B, p50\u22487.2s), not a span-order assumption (R5 closure).",
+        "description": "Browser \u2014 search & browse (no order) - read-only, no order; reconstructed from the trace span-tree; folds entry ops: browser_browse_flow",
         "weight": 0.9908,
         "entrypoint": "GET /",
         "codeRef": "src/frontend/pages/index.tsx#Home",
@@ -98,10 +98,6 @@
               "p95Ms": 12,
               "p99Ms": 23,
               "errorRate": 0.0
-            },
-            "thinkTime": {
-              "distribution": "exponential",
-              "meanMs": 11069.167
             }
           },
           {
@@ -117,10 +113,6 @@
               "p95Ms": 42,
               "p99Ms": 108,
               "errorRate": 0.0
-            },
-            "thinkTime": {
-              "distribution": "exponential",
-              "meanMs": 11069.167
             }
           },
           {
@@ -135,10 +127,6 @@
               "p95Ms": 42,
               "p99Ms": 167,
               "errorRate": 0.0
-            },
-            "thinkTime": {
-              "distribution": "exponential",
-              "meanMs": 11069.167
             }
           },
           {
@@ -153,10 +141,6 @@
               "p95Ms": 84,
               "p99Ms": 148,
               "errorRate": 0.0
-            },
-            "thinkTime": {
-              "distribution": "exponential",
-              "meanMs": 11069.167
             }
           },
           {
@@ -183,7 +167,7 @@
       },
       {
         "id": "buyer",
-        "description": "Buyer \u2014 browse, add to cart, place order - places an order; reconstructed from the trace span-tree; folds entry ops: buyer_checkout_flow.",
+        "description": "Buyer \u2014 browse, add to cart, place order - places an order; reconstructed from the trace span-tree; folds entry ops: buyer_checkout_flow",
         "weight": 0.0092,
         "entrypoint": "GET /api/products?currencyCode=USD",
         "codeRef": "src/frontend/pages/api/products/index.ts#handler",
@@ -371,7 +355,7 @@
     "coverage": 1.0
   },
   "status": {
-    "revision": 2,
-    "hash": "sha256:2409e856615a12b16f82773ca12efe39a69d96ffedb93d5b02de7bbe3cb5946b"
+    "revision": 3,
+    "hash": "sha256:cdd5294c0c0dd008394623b6eef41a4fea8641cfbbf64604714e6a6c1d9639e3"
   }
 }

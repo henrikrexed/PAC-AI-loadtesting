@@ -81,16 +81,16 @@ def main() -> int:
     sfx = json.loads(SESSION_FIXTURE.read_text())
 
     # --- SCOPE §3.1 step 2c tier (ii) / Path B: OTel session.id session-stitch (ISI-5693) ---
-    # Grail-native R5 closure. session.id is present on the `ad` service (20.4% of its spans,
-    # 5,241 browse sessions) — the ad-slot call fired on each browse page view. Consecutive
-    # GetAds within a session ⇒ consecutive ad-bearing page views ⇒ measured browse think-time.
-    # That measured think-time replaces the span-order *assumption* on the Browser journey.
-    # Coverage is recorded on the model source so the fidelity is auditable (R1-adjacent).
+    # Grail-native. We record session.id coverage so fidelity is auditable (R1-adjacent), but on
+    # THIS tenant the signal is NOT usable as journey think-time (board review, 2026-10-12):
+    # session.id is emitted ONLY on the homepage ad/recommendation data fetch (frontend
+    # `/api/data` → `ad GetAds`), which repeats during a session. Verified read-only: ad-session
+    # traces reach NONE of cart/checkout/payment/product-catalog, and 0 of 1.41M frontend spans
+    # carry session.id. So Path B here sees a single use case (ad-fetch cadence), not the
+    # multi-action user journey. We therefore DO NOT attach the ad cadence as Browser think-time
+    # (that would overstate it); the Browser journey stays on span-order. See the R5 note and
+    # docs/evidence/isi5693-session-stitch.md.
     session_cov = ss.session_coverage(sfx["coverage_rows"])
-    # Think-time is a validated exponential fit (median/mean 0.65 ≈ ln2); use the compact
-    # closed-form on steps to keep the model lean. The full empirical sample (p50 7.2s / p90
-    # 27.7s / p99 45.1s) lives in fixtures/wkf10640_session_stitch.json for higher-fidelity use.
-    browse_think = sfx["ad_think_time_spec_exponential"]  # {distribution:"exponential", meanMs}
 
     # --- G1: behavioral archetypes (Buyer / Browser) by business outcome ---
     journeys = [cl.Journey(op=j["op"], traces=j["traces"], svc_set=j["svc_set"]) for j in fx["journeys"]]
@@ -106,27 +106,15 @@ def main() -> int:
 
     model_journeys = []
     for a in archetypes:
-        steps = [dict(s) for s in a.steps]  # copy so we can enrich without mutating the fixture
-        # Path B: the Browser journey's page views carry the session.id (via the ad-slot call);
-        # attach the measured empirical think-time between page-view steps. The Buyer (checkout)
-        # path has no session.id signal → left as span-order inference (no fabricated think-time).
-        session_note = ""
-        if not a.places_order and browse_think and len(steps) > 1:
-            for s in steps[:-1]:  # think-time is the pause *after* a step, before the next
-                s["thinkTime"] = browse_think
-            session_note = (" Think-time between page views is the MEASURED distribution from "
-                            "5,241 stitched OTel session.id chains on the ad service (Path B, "
-                            "p50≈7.2s), not a span-order assumption (R5 closure).")
         model_journeys.append({
             "id": a.id,
             "description": f"{a.name} - {'places an order' if a.places_order else 'read-only, no order'}; "
-                           f"reconstructed from the trace span-tree; folds entry ops: {', '.join(a.members)}."
-                           + session_note,
+                           f"reconstructed from the trace span-tree; folds entry ops: {', '.join(a.members)}",
             "weight": round(a.weight, 4),
-            "entrypoint": steps[0]["operation"] if steps else a.members[0],
-            "codeRef": steps[0].get("codeRef") if steps else None,
+            "entrypoint": a.steps[0]["operation"] if a.steps else a.members[0],
+            "codeRef": a.steps[0].get("codeRef") if a.steps else None,
             "evidenceSource": "span",
-            "steps": steps,
+            "steps": a.steps,
             "baseline": BUYER_BASELINE if a.places_order else BROWSER_BASELINE,
         })
 
@@ -154,7 +142,7 @@ def main() -> int:
         caps=caps,
         coverage=cov,
         session_id_coverage=session_cov,
-        revision=2,
+        revision=3,
     )
 
     proposal = render_proposal(
@@ -177,15 +165,20 @@ def main() -> int:
             "303,223 of 306,033 frontend root traces that do / do not reach checkout/payment).",
             "**R1 sampling.** dt.system.sampling_ratio = 1.0 on frontend root spans (no sampling "
             "correction applied).",
-            "**R5 session-chaining (Path B applied, partial).** An OTel `session.id` IS present on "
-            "the `ad` service (20.4% of its spans; 5,241 browse sessions, mean 5.3 ad-slot loads each) "
-            "but NOT on the frontend/checkout/payment spans. So the **Browser** journey's inter-page "
-            "think-time is now the MEASURED session-chain distribution (p50 7.2s / p90 27.7s / p99 "
-            "45.1s, session span p50 47s) instead of a span-order assumption. The **Buyer** (checkout) "
-            "path carries no session.id and is still reconstructed from self-contained checkout traces "
-            "(browse->cart->checkout). End-to-end session stitching would need session.id propagated "
-            "as baggage across all frontend services (OTel session semconv); see ISI-5693 / ISI-5691 "
-            "(Path A RUM fusion remains board-gated).",
+            "**R5 session-chaining (Path B evaluated — NOT usable as journey think-time here).** "
+            "An OTel `session.id` exists, but only on the homepage ad/recommendation data fetch "
+            "(frontend `/api/data` -> `ad GetAds`), which repeats during a session (20.4% of ad "
+            "spans; 5,241 sessions, mean 5.3 fetches each, ~7.2s median cadence). Verified read-only: "
+            "ad-session traces reach NONE of cart/checkout/payment/product-catalog, and **0 of "
+            "1.41M frontend spans carry `session.id`** — the id never tags a real user action "
+            "(browse/cart/checkout all exist but are untagged). So Path B sees a single use case "
+            "(ad-fetch cadence), not a multi-action user journey; the ~7.2s is page-refresh cadence, "
+            "NOT per-action think-time, and is deliberately NOT attached to any journey. Both Browser "
+            "and Buyer stay on span-order reconstruction. Coverage is still recorded on "
+            "`source.sessionIdCoverage` for auditability. **To make Path B usable the app must "
+            "propagate `session.id` as baggage onto the frontend entry spans of every action** "
+            "(OTel session semconv), not just the ad call. Path A RUM fusion remains board-gated "
+            "(ISI-5691).",
         ],
     )
 

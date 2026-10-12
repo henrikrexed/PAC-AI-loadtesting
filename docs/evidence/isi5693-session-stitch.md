@@ -7,12 +7,19 @@
 > Tenant **wkf10640** via the readonly `tenant-b` dtctl context. Window: 24h ending
 > 2026-10-12T13:16Z. Extraction/investigation only — tenant kept read-only (§7.1).
 
-## Verdict: **GO (partial, sparse).** Path B works and is now shipped in the extractor.
+## Verdict: **mechanism GO; on wkf10640 the signal is NOT usable as a user-session journey.**
 
-`session.id` is real, Grail-native, and stitchable — but **sparse** on wkf10640. It closes R5
-for the **Browser** journey (real browse think-times) and generalises to a non-browser A2A
-agent, while the full browse→checkout chain still needs span-order reconstruction because the
-id does not propagate to the frontend/checkout spans.
+The session-stitch **mechanism** works and is shipped (pure module, app-agnostic, tested). But
+a board review (2026-10-12, §6 below) correctly flagged that the `session.id` on this tenant is
+**not a usable user-session signal**: it is emitted *only* on the homepage ad/recommendation
+data fetch (`frontend /api/data` → `ad GetAds`), which **repeats** during a session. It tags a
+**single use case** (ad fetch), never a real user action — verified: ad-session traces reach
+**none** of cart/checkout/payment/product-catalog, and **0 of 1.41M** frontend spans carry
+`session.id`, even though the full browse→cart→checkout surface exists. So Path B here yields
+ad-fetch *cadence*, **not** multi-action journeys or per-action think-time. The ~7.2s cadence is
+therefore **deliberately NOT attached** to any journey (correcting an earlier rev-2 overstatement);
+both journeys stay on span-order. Coverage is still recorded for auditability. The mechanism will
+light up only once the **app** propagates `session.id` as baggage onto every action's entry span.
 
 ---
 
@@ -36,19 +43,22 @@ fetch spans | filter isNotNull(session.id)
 checkout, payment, cart, etc. carry **none** — consistent with the ISI-5691 spike baseline
 (`ad` 5,274 / smartfreight 132).
 
-> **Why so sparse:** the astronomy-shop demo sets the OTel `session.id` baggage→span-attribute
-> only on the `ad` service's `GetAds` call (the ad-slot lookup fired on each ad-bearing page
-> view); it is not propagated end-to-end. smartfreight sets it once per chat workflow. This is
-> an instrumentation choice in the apps, not a tenant limitation — the mechanism would light up
-> fully if apps propagated `session.id` as baggage across all services (OTel session semconv).
+> **Why so sparse (and why it's the wrong signal here):** the astronomy-shop demo sets the OTel
+> `session.id` baggage→span-attribute **only** on the homepage ad/recommendation data fetch
+> (`frontend /api/data` → `ad GetAds`), which repeats during a session; it is **not** propagated
+> onto the frontend entry spans of real actions (browse/cart/checkout — §6). smartfreight sets it
+> once per chat workflow. This is an app instrumentation choice, not a tenant limitation — the
+> mechanism lights up only when apps propagate `session.id` onto every action's entry span.
 
-## 2. Stitch where present (step 2c.2)
+## 2. Stitch where present (step 2c.2) — what the chain actually contains
 
-Group session-bearing spans by `session.id`, order by `start_time`, diff consecutive actions.
+Group session-bearing spans by `session.id`, order by `start_time`, diff consecutive events.
 `scripts/session_stitch.py` does this as a pure function (`stitch()`), reproduced here on the
-5,241 `ad` chains (28,021 spans exported read-only to CSV, nanosecond-precise parse):
+5,241 `ad` chains (28,021 spans exported read-only to CSV, nanosecond-precise parse). **Note:
+every event in these chains is the *same* ad fetch — so the gaps below are ad-refresh _cadence_,
+not think-time between distinct user actions (see §4/§6).**
 
-**Think-time** (next.start − prev.end, clipped ≥ 0; 1.0 % of gaps were negative/overlapping):
+**Inter-event gap** (next.start − prev.end, clipped ≥ 0; 1.0 % negative/overlapping):
 
 | metric | value |
 |---|---:|
@@ -87,23 +97,22 @@ sampling ratio — new additive `metadata.source.sessionIdCoverage`
 tenant-wide 0.056 % is noted above so the number is never overstated.) `hasSessionSignal:false`
 ⇒ 0 % coverage ⇒ pure span-order fallback, surfaced as an R5 line in the proposal.
 
-## 4. Side-by-side — Browser journey, span-only vs Path B (astroshop)
+## 4. Side-by-side — what `session.id` stitches vs what a user journey needs (astroshop)
 
-The **Browser** archetype's page views are exactly the ad-bearing views that carry `session.id`.
+| dimension | span-only (tiers 2a/2b) | Path B on `session.id` here | usable as journey? |
+|---|---|---|---|
+| session boundary | none (R5) | real: 5,241 `session.id` chains | boundary yes |
+| what the chain contains | — | **only** repeated `ad GetAds` / `/api/data` fetches | **no** — one use case |
+| actions/session | inferred from a self-contained trace | 5.35 **ad fetches** (not distinct actions) | no |
+| inter-event gap | assumed | 7.2 s median — **ad-fetch cadence**, not think-time | no |
+| distinct use cases reached | browse/cart/checkout (span-order) | **none** beyond ad (verified join, §6) | no |
+| dependency | none | none (Grail only) | — |
 
-| dimension | span-only (tiers 2a/2b, pre-ISI-5693) | **Path B (ISI-5693)** |
-|---|---|---|
-| session boundary | none — "no notion of a session" (R5) | real: 5,241 `session.id` chains |
-| actions/session | inferred from a self-contained trace | **measured 5.35** (p50 5, p99 7) |
-| inter-action think-time | **assumed** flat constant (analyst guess) | **measured** empirical dist, p50 **7.2 s** / p90 27.7 s / p99 45.1 s |
-| session duration | n/a | p50 47 s, p99 96 s |
-| think-time on steps | absent | `thinkTime` object on 4/5 Browser steps |
-| Buyer (checkout) path | self-contained checkout trace | **unchanged** — no `session.id` on checkout/payment spans |
-| dependency | none | none (Grail only; no RUM, no classic token, no PII) |
-
-Net: the Browser journey's pacing is now data-derived, not assumed — a strict R5 fidelity gain
-for the dominant (99.1 % weight) journey. The Buyer journey is honestly left on span-order
-inference because the signal does not reach its spans.
+**Net (corrected):** on wkf10640, `session.id` does **not** reconstruct a user journey — it only
+measures how often the homepage ad block re-fetches within a browser session. Attaching that
+cadence as journey think-time (earlier rev 2) **overstated** the signal and is reverted. Both
+journeys stay on span-order; `session.id` coverage is recorded but not used for pacing. The
+fidelity gain Path B promises is real **only** when the app tags real actions with `session.id`.
 
 ## 5. Generalization check (step 2c.4) — app-agnostic
 
@@ -113,6 +122,35 @@ cleanly into 131 single-action chat sessions. Single-action sessions correctly y
 think-time (`think_time_spec()` returns `None`) rather than a fabricated one. Any service that
 propagates `session.id` is stitchable, browser or not. ✓
 
+## 6. Board review (2026-10-12) — "ad is a main-page request, this is incorrect"
+
+The board challenged the first pass: *"ad is technically a request called on the main page… so
+it is incorrect. you should see more use cases using the user session."* Correct. Deeper
+read-only analysis of the tenant confirms it:
+
+1. **No other session/user attribute exists.** Probing every candidate over 50.5M spans
+   (`session.id`, `session_id`, `app.session.id`, `user.session.id`, `enduser.id`, `user.id`,
+   `rum.sessionId`, `dt.session.id`): only `session.id` is non-null (28,170), the rest are 0.
+
+2. **`session.id` tags only the ad data-fetch.** Joining `session.id` ad spans → their `trace.id`
+   → the trace's entry spans shows the traces are rooted at
+   `frontend-proxy ingress → frontend GET /api/data → ad GetAds` — the homepage
+   ad/recommendation fetch, repeating within a session.
+
+3. **Those traces reach no real use case.** Join of ad-session `trace.id`s against
+   `{cart, checkout, payment, product-catalog, recommendation, currency}` → **0 rows**. The
+   session never touches a purchase funnel action.
+
+4. **The real actions exist but are untagged.** `0 of 1,406,793` frontend spans carry
+   `session.id`, yet the frontend serves the full surface: `GET /api/cart`, `POST /api/cart`,
+   `GET /api/products/[productId]`, `POST /api/checkout`, `/api/recommendations`, `/api/shipping`,
+   `/api/currency`, … None of them is session-tagged.
+
+**Conclusion:** `session.id` on wkf10640 is a main-page ad-fetch marker, not a user-session
+signal. Path B cannot recover multi-use-case journeys here. Fix is app-side (propagate
+`session.id` baggage onto every action's entry span). The extractor change is corrected to
+record coverage **without** using the cadence as think-time (model rev 3).
+
 ## Deliverables (shipped)
 
 - `skills/workload-model/scripts/session_stitch.py` — pure Path B module: `stitch()`,
@@ -120,8 +158,9 @@ propagates `session.id` is stitchable, browser or not. ✓
 - `skills/workload-model/scripts/schema.json` — additive `source.sessionIdCoverage` (R5 audit).
 - `skills/workload-model/scripts/emit.py` — threads coverage onto the model + renders the R5
   Path B proposal line (both the `hasSessionSignal` and the 0 %-fallback branch).
-- `skills/workload-model/scripts/build_wkf10640.py` — astroshop build now stitches the Browser
-  journey think-time from `session.id` chains, records coverage, bumps to **rev 2**, refines R5.
+- `skills/workload-model/scripts/build_wkf10640.py` — astroshop build records `session.id`
+  coverage on the model and bumps to **rev 3**; after the board review it does **not** attach the
+  ad-fetch cadence as journey think-time (both journeys stay on span-order); R5 note corrected.
 - `skills/workload-model/fixtures/wkf10640_session_stitch.json` — live facts + real think-time
   samples (deterministic replay without tenant access).
 - `skills/workload-model/tests/test_session_stitch.py` — 12 tests (ordering, think-time clip,
@@ -129,13 +168,16 @@ propagates `session.id` is stitchable, browser or not. ✓
 
 ## Methodology note for BigBoss (fold into §3.1 step 2c)
 
-Step 2c tier (ii) is now **implemented and default-on**: the extractor detects `session.id` on
-spans, stitches sessions where present, records coverage, and falls back to span-order where
-absent. Reality on wkf10640: the signal exists but is **sparse** (0.056 % tenant-wide, 2
-services, single op each) because the demo apps do not propagate it end-to-end. To realise the
-full R5 closure the **apps** must propagate `session.id` as baggage across all services — an
-instrumentation recommendation, not a SCOPE change. Path A (RUM/USQL fusion) remains the only
-route to true browser user-session journeys and stays board-gated (ISI-5691).
+Step 2c tier (ii) is **implemented and default-on** as a mechanism: the extractor detects
+`session.id`, stitches where present, records coverage, and falls back to span-order otherwise.
+**But on wkf10640 the signal must not be used for journey pacing** (board review §6): `session.id`
+tags only the homepage ad fetch (0.056 % tenant-wide; 0 of 1.41M frontend spans; ad-session
+traces reach no funnel action), so it reconstructs a single repeating use case, not a user
+journey. The extractor therefore records coverage **without** deriving think-time from it here.
+The blocker to realising Path B's value is **app-side**: propagate `session.id` as baggage onto
+every action's **entry span** (OTel session semconv) — an instrumentation recommendation, not a
+SCOPE change. Until then, span-order (2a/2b) is the method. Path A (RUM/USQL fusion) remains the
+only route to true browser user-session journeys and stays board-gated (ISI-5691).
 
 ## Appendix — query ledger (all read-only, `--context tenant-b`)
 
@@ -148,5 +190,9 @@ route to true browser user-session journeys and stays board-gated (ISI-5691).
 | raw chains (ad) | `... service.name=="ad" and isNotNull(session.id) \| fields session.id, start_time, duration, span.name` (→ CSV, think-times computed in `session_stitch.py`) |
 | op carrying id (ad) | `... service.name=="ad" and isNotNull(session.id) \| summarize count(), by:{span.name, span.kind}` → single op `GetAds` |
 | generalization (smartfreight) | `... service.name=="smartfreight-agent-service" and isNotNull(session.id) \| summarize actions=count(), by:{session.id} \| summarize ...` → 131 × 1 action |
+| **§6** all session/user attrs | `fetch spans \| summarize countIf(isNotNull(session.id)), countIf(isNotNull(session_id)), countIf(isNotNull(app.session.id)), countIf(isNotNull(user.session.id)), countIf(isNotNull(enduser.id)), countIf(isNotNull(user.id)), ...` → only `session.id` non-null |
+| **§6** session→trace→entry op | `... service.name=="ad" and isNotNull(session.id) \| fields session.id, trace.id \| join [ ... request.is_root_span==true \| fields trace.id, service.name, span.name ], on:{trace.id} \| summarize by:{entryOp}` → frontend-proxy ingress / frontend /api/data / ad GetAds |
+| **§6** ad-session ⟂ funnel | `... service.name=="ad" and isNotNull(session.id) \| fields trace.id \| join [ ... in(service.name,{"cart","checkout","payment","product-catalog",...}) \| fields trace.id, service.name ], on:{trace.id} \| summarize by:{svc}` → **0 rows** |
+| **§6** frontend untagged | `fetch spans \| filter service.name=="frontend" \| summarize total=count(), withSession=countIf(isNotNull(session.id))` → 1,406,793 / **0** |
 
 Token `tenant-b-read` still un-rotated (flagged to board since ISI-5684) — valid for this round.

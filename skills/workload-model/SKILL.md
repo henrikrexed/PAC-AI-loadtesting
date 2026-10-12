@@ -56,7 +56,11 @@ deterministic path. **dtctl carries SCOPE; the skill owns the query pack, algori
      carry an OTel `session.id` (session semconv, baggage→attribute), group by it, order by
      start → **real** session chains + **measured** inter-action think-times + session
      boundaries, feeding the §8.4 SequenceReconstructor instead of span-order inference (closes
-     §11 **R5**). Grail-native: no RUM / classic-token / PII dependency (Path A = RUM/USQL fusion
+     §11 **R5**). **Validity check first:** the id must sit on each *action's* entry span. A
+     leaf-/single-op id (e.g. an ad-fetch call) yields only that op's *cadence*, not a journey —
+     verify via `session.id`→`trace.id`→entry-op and a funnel-reach join before using it for
+     pacing (board review, ISI-5693 on wkf10640). Grail-native: no RUM / classic-token / PII
+     dependency (Path A = RUM/USQL fusion
      stays board-gated, ISI-5691 NO-GO on Grail-only RUM). App-agnostic — works for non-browser
      apps too (validated on an A2A agent). Coverage % is recorded on `source.sessionIdCoverage`
      next to the sampling ratio; where `session.id` is absent, tiers 2a/2b are the unchanged
