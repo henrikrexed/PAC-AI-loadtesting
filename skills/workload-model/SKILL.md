@@ -52,6 +52,15 @@ deterministic path. **dtctl carries SCOPE; the skill owns the query pack, algori
    - **Jaccard sub-split (`scripts/clustering.py`) — secondary.** If one archetype still fans
      into structurally distinct flows, sub-split by Jaccard(svcSet)≥0.6 **and** op-name stem;
      high-reach flows (reach≥10) never merge; keep cumulative coverage ≥0.80 and ≤6 journeys.
+   - **Session-stitch (`scripts/session_stitch.py`) — step 2c tier (ii), Path B.** Where spans
+     carry an OTel `session.id` (session semconv, baggage→attribute), group by it, order by
+     start → **real** session chains + **measured** inter-action think-times + session
+     boundaries, feeding the §8.4 SequenceReconstructor instead of span-order inference (closes
+     §11 **R5**). Grail-native: no RUM / classic-token / PII dependency (Path A = RUM/USQL fusion
+     stays board-gated, ISI-5691 NO-GO on Grail-only RUM). App-agnostic — works for non-browser
+     apps too (validated on an A2A agent). Coverage % is recorded on `source.sessionIdCoverage`
+     next to the sampling ratio; where `session.id` is absent, tiers 2a/2b are the unchanged
+     fallback. See `docs/evidence/isi5693-session-stitch.md`.
 4. **Code-link** each journey step (`codeRef = path#symbol`); flag `unlinked: true` otherwise.
 5. **Derive load + ramp (G3)** — `scripts/shaping.py`: pace (count/window, sampling-corrected),
    Little's Law concurrency **from the server span, never the load-driver wrapper**, CoV-gated

@@ -39,6 +39,7 @@ def build_model(
     payloads: dict[str, Any],
     caps: dict[str, Any],
     coverage: float,
+    session_id_coverage: dict[str, Any] | None = None,
     revision: int = 1,
 ) -> dict[str, Any]:
     evidence = sorted({j.get("evidenceSource", "span") for j in journeys})
@@ -69,6 +70,7 @@ def build_model(
                 "evidenceSources": evidence,
                 "accessLogAvailability": access_log_availability,
                 "samplingRatio": sampling_ratio,
+                **({"sessionIdCoverage": session_id_coverage} if session_id_coverage is not None else {}),
             },
         },
         "spec": spec,
@@ -152,6 +154,27 @@ def render_proposal(
         "consumers, websockets, fire-and-forget — are invisible on both sides. At least one run "
         "should be cross-checked against infra metrics (CPU/connections), not telemetry alone.",
     ]
+    sic = src.get("sessionIdCoverage")
+    if sic is not None:
+        if sic.get("hasSessionSignal"):
+            svc = ", ".join(
+                f"`{s['service']}` {s['coveragePct']}% ({s.get('sessions', 0)} sessions)"
+                for s in sic.get("services", []) if s.get("sessionSpans")
+            )
+            risks.append(
+                "**R5 session signal (Path B — OTel `session.id` on spans).** "
+                f"`session.id` coverage **{sic.get('overallCoveragePct')}%** across the reported "
+                f"session-bearing services; present on: {svc}. Where present, journeys are stitched from real session "
+                "chains (ordered actions + measured think-times) rather than span-order inference; "
+                "elsewhere the span-order method (tiers 2a/2b) is the unchanged fallback. No RUM / "
+                "classic-token dependency (Path A is board-gated; ISI-5691 NO-GO on Grail-only RUM)."
+            )
+        else:
+            risks.append(
+                "**R5 session signal (Path B).** No OTel `session.id` on any span in the window "
+                "(0% coverage) → span-order session reconstruction (tiers 2a/2b) is the method; no "
+                "session-stitch available on this target."
+            )
     if risks_extra:
         risks.extend(risks_extra)
     risks_block = "\n".join(f"- {r}" for r in risks)

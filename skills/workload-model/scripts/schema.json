@@ -35,6 +35,30 @@
             "samplingRatio": {
               "type": "number",
               "description": "R1: source sampling ratio applied (1.0 = unsampled / Sampled:no)"
+            },
+            "sessionIdCoverage": {
+              "type": "object",
+              "description": "SCOPE §3.1 step 2c tier (ii) / R5: OTel session.id coverage on spans (Path B). Recorded alongside samplingRatio so session-stitch fidelity is auditable. hasSessionSignal=false ⇒ span-order fallback (tiers 2a/2b) was used.",
+              "required": ["hasSessionSignal", "overallCoveragePct"],
+              "properties": {
+                "hasSessionSignal": { "type": "boolean" },
+                "overallCoveragePct": { "type": "number", "description": "Σ session-bearing spans / Σ spans over reported services" },
+                "services": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["service", "coveragePct"],
+                    "properties": {
+                      "service": { "type": "string" },
+                      "totalSpans": { "type": "integer" },
+                      "sessionSpans": { "type": "integer" },
+                      "sessions": { "type": "integer" },
+                      "coveragePct": { "type": "number" },
+                      "meanActions": { "type": "number" }
+                    }
+                  }
+                }
+              }
             }
           }
         }

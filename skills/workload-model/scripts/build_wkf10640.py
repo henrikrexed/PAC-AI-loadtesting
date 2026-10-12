@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 import clustering as cl
+import session_stitch as ss
 import shaping as sh
 from archetypes import to_archetypes, coverage as arch_coverage
 from emit import build_model, render_proposal
@@ -24,6 +25,7 @@ from g0_gate import evaluate_g0
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent.parent
 FIXTURE = HERE.parent / "fixtures" / "wkf10640_extract.json"
+SESSION_FIXTURE = HERE.parent / "fixtures" / "wkf10640_session_stitch.json"
 OUT_DIR = ROOT / "loadtests" / "wkf10640-astroshop-frontend"
 GENERATED_AT = "2026-10-12T00:00:00Z"
 
@@ -76,6 +78,19 @@ def _payloads(fx: dict) -> dict:
 
 def main() -> int:
     fx = json.loads(FIXTURE.read_text())
+    sfx = json.loads(SESSION_FIXTURE.read_text())
+
+    # --- SCOPE §3.1 step 2c tier (ii) / Path B: OTel session.id session-stitch (ISI-5693) ---
+    # Grail-native R5 closure. session.id is present on the `ad` service (20.4% of its spans,
+    # 5,241 browse sessions) — the ad-slot call fired on each browse page view. Consecutive
+    # GetAds within a session ⇒ consecutive ad-bearing page views ⇒ measured browse think-time.
+    # That measured think-time replaces the span-order *assumption* on the Browser journey.
+    # Coverage is recorded on the model source so the fidelity is auditable (R1-adjacent).
+    session_cov = ss.session_coverage(sfx["coverage_rows"])
+    # Think-time is a validated exponential fit (median/mean 0.65 ≈ ln2); use the compact
+    # closed-form on steps to keep the model lean. The full empirical sample (p50 7.2s / p90
+    # 27.7s / p99 45.1s) lives in fixtures/wkf10640_session_stitch.json for higher-fidelity use.
+    browse_think = sfx["ad_think_time_spec_exponential"]  # {distribution:"exponential", meanMs}
 
     # --- G1: behavioral archetypes (Buyer / Browser) by business outcome ---
     journeys = [cl.Journey(op=j["op"], traces=j["traces"], svc_set=j["svc_set"]) for j in fx["journeys"]]
@@ -91,15 +106,27 @@ def main() -> int:
 
     model_journeys = []
     for a in archetypes:
+        steps = [dict(s) for s in a.steps]  # copy so we can enrich without mutating the fixture
+        # Path B: the Browser journey's page views carry the session.id (via the ad-slot call);
+        # attach the measured empirical think-time between page-view steps. The Buyer (checkout)
+        # path has no session.id signal → left as span-order inference (no fabricated think-time).
+        session_note = ""
+        if not a.places_order and browse_think and len(steps) > 1:
+            for s in steps[:-1]:  # think-time is the pause *after* a step, before the next
+                s["thinkTime"] = browse_think
+            session_note = (" Think-time between page views is the MEASURED distribution from "
+                            "5,241 stitched OTel session.id chains on the ad service (Path B, "
+                            "p50≈7.2s), not a span-order assumption (R5 closure).")
         model_journeys.append({
             "id": a.id,
             "description": f"{a.name} - {'places an order' if a.places_order else 'read-only, no order'}; "
-                           f"reconstructed from the trace span-tree; folds entry ops: {', '.join(a.members)}",
+                           f"reconstructed from the trace span-tree; folds entry ops: {', '.join(a.members)}."
+                           + session_note,
             "weight": round(a.weight, 4),
-            "entrypoint": a.steps[0]["operation"] if a.steps else a.members[0],
-            "codeRef": a.steps[0].get("codeRef") if a.steps else None,
+            "entrypoint": steps[0]["operation"] if steps else a.members[0],
+            "codeRef": steps[0].get("codeRef") if steps else None,
             "evidenceSource": "span",
-            "steps": a.steps,
+            "steps": steps,
             "baseline": BUYER_BASELINE if a.places_order else BROWSER_BASELINE,
         })
 
@@ -126,6 +153,8 @@ def main() -> int:
         payloads=payloads,
         caps=caps,
         coverage=cov,
+        session_id_coverage=session_cov,
+        revision=2,
     )
 
     proposal = render_proposal(
@@ -148,8 +177,15 @@ def main() -> int:
             "303,223 of 306,033 frontend root traces that do / do not reach checkout/payment).",
             "**R1 sampling.** dt.system.sampling_ratio = 1.0 on frontend root spans (no sampling "
             "correction applied).",
-            "**R5 session-chaining limit.** No persistent session id on browse spans; the Buyer "
-            "archetype is reconstructed from self-contained checkout traces (browse->cart->checkout).",
+            "**R5 session-chaining (Path B applied, partial).** An OTel `session.id` IS present on "
+            "the `ad` service (20.4% of its spans; 5,241 browse sessions, mean 5.3 ad-slot loads each) "
+            "but NOT on the frontend/checkout/payment spans. So the **Browser** journey's inter-page "
+            "think-time is now the MEASURED session-chain distribution (p50 7.2s / p90 27.7s / p99 "
+            "45.1s, session span p50 47s) instead of a span-order assumption. The **Buyer** (checkout) "
+            "path carries no session.id and is still reconstructed from self-contained checkout traces "
+            "(browse->cart->checkout). End-to-end session stitching would need session.id propagated "
+            "as baggage across all frontend services (OTel session semconv); see ISI-5693 / ISI-5691 "
+            "(Path A RUM fusion remains board-gated).",
         ],
     )
 
