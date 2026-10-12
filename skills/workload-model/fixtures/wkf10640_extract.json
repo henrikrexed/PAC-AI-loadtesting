@@ -1,0 +1,507 @@
+{
+  "_comment": "Live extraction facts captured from Dynatrace tenant wkf10640 (apps.dynatrace.com; dtctl context 'tenant-b', readonly dt0s16 read token) on 2026-10-12 by the workload-model skill for ISI-5684 (validate the pipeline on a fresh board-provided tenant). Every number came from a dtctl DQL query run live against the tenant. Target app: the OpenTelemetry Astroshop demo (service 'frontend', SERVICE-39720C1E0047A5C0), the dominant workload in a shared multi-app playground (also hosts unguard, easytrade, image-provider, cloudsreagents). Same otel-demo frontend codebase as the oat05854 reference, so journey step structure + codeRefs carry over; all weights/baselines/pace/CoV/concurrency/cache numbers are wkf10640-specific.",
+  "environment": "wkf10640",
+  "timeframe": "-3h (2026-10-12, shared demo playground window)",
+  "window_seconds": 10800,
+  "access_log_availability": "unavailable",
+  "access_log_probe": "fetch logs | filter k8s.container.name == 'istio-proxy' -> 0 lines. No mesh access logs shipped; HTTP surface recovered from frontend server-span span.name routes (spans-only).",
+  "sampling_ratio": 1.0,
+  "front_end": {
+    "resolved": "frontend",
+    "resolved_op": "GET",
+    "method": "earliest-start root span per trace + noise classifier. Root spans on this tenant are OneAgent/OTel server spans on 'frontend' (no load-generator user_* driver layer), so the HTTP surface is recovered from frontend server-span span.name routes.",
+    "ingress_crosscheck": "N/A - no istio-ingressgateway access logs on tenant; edge 'frontend-proxy' (ingress) present as the mesh-edge equivalent and reach-confirmed (69,451 ingress root spans)."
+  },
+  "journeys": [
+    {
+      "op": "buyer_checkout_flow",
+      "traces": 2810,
+      "svc_set": [
+        "frontend",
+        "frontend-proxy",
+        "cart",
+        "currency",
+        "shipping",
+        "quote",
+        "payment",
+        "checkout",
+        "email",
+        "product-catalog",
+        "flagd"
+      ]
+    },
+    {
+      "op": "browser_browse_flow",
+      "traces": 303223,
+      "svc_set": [
+        "frontend",
+        "frontend-proxy",
+        "product-catalog",
+        "cart",
+        "recommendation",
+        "ad",
+        "currency",
+        "flagd"
+      ]
+    }
+  ],
+  "per_minute_cov": {
+    "meanRpm": 1808.98,
+    "sd": 533.11,
+    "cov": 0.2947,
+    "minRpm": 120,
+    "maxRpm": 2604,
+    "bins": 181
+  },
+  "per_minute_counts": [
+    394,
+    1676,
+    1693,
+    1618,
+    1678,
+    1471,
+    1669,
+    1633,
+    1669,
+    1730,
+    2063,
+    1533,
+    1665,
+    1520,
+    1480,
+    1421,
+    1623,
+    1733,
+    1581,
+    1671,
+    1538,
+    1579,
+    1678,
+    1746,
+    1502,
+    1921,
+    1732,
+    1626,
+    1639,
+    1447,
+    1585,
+    1726,
+    1761,
+    1647,
+    1511,
+    1455,
+    1473,
+    1564,
+    1621,
+    1442,
+    1835,
+    1663,
+    1749,
+    1487,
+    1774,
+    1626,
+    1488,
+    1609,
+    1534,
+    1546,
+    1595,
+    1663,
+    1673,
+    1554,
+    1440,
+    1815,
+    1546,
+    1757,
+    1792,
+    1530,
+    1615,
+    1711,
+    1606,
+    1561,
+    1629,
+    1431,
+    1534,
+    1728,
+    1460,
+    1604,
+    1486,
+    1713,
+    1730,
+    2003,
+    1336,
+    1688,
+    1483,
+    1623,
+    1038,
+    418,
+    344,
+    657,
+    849,
+    678,
+    747,
+    403,
+    399,
+    1692,
+    2295,
+    2237,
+    1523,
+    1499,
+    1740,
+    525,
+    588,
+    628,
+    710,
+    1387,
+    1581,
+    1632,
+    1639,
+    1820,
+    1588,
+    1789,
+    1517,
+    1806,
+    1764,
+    1838,
+    1621,
+    1731,
+    1915,
+    1372,
+    1548,
+    1684,
+    1687,
+    1833,
+    1759,
+    1734,
+    1840,
+    1802,
+    2344,
+    2424,
+    2440,
+    2262,
+    2382,
+    2405,
+    2583,
+    2462,
+    2483,
+    2422,
+    2537,
+    2506,
+    2458,
+    2448,
+    2337,
+    2392,
+    2473,
+    2446,
+    2440,
+    2465,
+    2427,
+    2392,
+    2528,
+    2316,
+    2476,
+    2567,
+    2528,
+    2497,
+    2313,
+    2222,
+    2510,
+    2061,
+    2444,
+    2284,
+    2104,
+    2380,
+    2443,
+    2542,
+    2433,
+    2460,
+    2436,
+    2365,
+    2604,
+    2476,
+    2353,
+    2479,
+    2468,
+    2448,
+    2484,
+    2331,
+    2324,
+    2133,
+    2416,
+    2090,
+    2318,
+    2461,
+    2491,
+    2472,
+    2472,
+    1860,
+    120
+  ],
+  "server_baseline_frontend": {
+    "p50_ms": 9,
+    "p90_ms": 147,
+    "p95_ms": 208,
+    "p99_ms": 349,
+    "mean_ms": 49,
+    "count": 810116,
+    "errs": 753
+  },
+  "server_rate_tps": 75.01,
+  "observed_concurrency": 3.6776,
+  "route_baselines": {
+    "GET /": {
+      "p50": 5,
+      "p95": 12,
+      "p99": 23,
+      "cnt": 5694
+    },
+    "GET /api/products?currencyCode=USD": {
+      "p50": 3,
+      "p95": 42,
+      "p99": 108,
+      "cnt": 9968
+    },
+    "POST /api/cart?currencyCode=USD": {
+      "p50": 4,
+      "p95": 30,
+      "p99": 108,
+      "cnt": 9218
+    },
+    "GET /api/cart": {
+      "p50": 8,
+      "p95": 31,
+      "p99": 73,
+      "cnt": 2941
+    },
+    "POST /api/checkout?currencyCode=USD": {
+      "p50": 7,
+      "p95": 236,
+      "p99": 364,
+      "cnt": 2946
+    },
+    "GET /api/data?contextKeys=telescopes": {
+      "p50": 2,
+      "p95": 42,
+      "p99": 167,
+      "cnt": 4734
+    },
+    "GET /api/recommendations": {
+      "p50": 40,
+      "p95": 84,
+      "p99": 148,
+      "cnt": 4367
+    },
+    "GET /api/currency": {
+      "p50": 4,
+      "p95": 44,
+      "p99": 104,
+      "cnt": 4394
+    }
+  },
+  "product_keys": {
+    "distinct": 10,
+    "reads": 22068,
+    "access_counts": {
+      "2ZYFJ3GM2N": 2273,
+      "L9ECAV7KIM": 2261,
+      "OLJCESPC7Z": 2246,
+      "6E92ZMYYFZ": 2234,
+      "1YMWWN1N4O": 2230,
+      "9SIQT8TOJO": 2214,
+      "LS4PSXUNUM": 2181,
+      "HQTGWGPNH4": 2162,
+      "66VCHSJNUP": 2137,
+      "0PUK6V6EV0": 2130
+    }
+  },
+  "_journey_note": "Root spans on wkf10640 are frontend server HTTP routes (no locust user_* driver). The two behavioral archetypes partition traffic by business outcome (does the flow reach an order-terminal service: checkout/payment?). Buyer = 2,810 traces reach checkout/payment; Browser = 303,223 do not. order-terminal detection is structural via ORDER_TERMINAL_PATTERNS.",
+  "order_split": {
+    "buyer_traces": 2810,
+    "browser_traces": 303223,
+    "buyer_share": 0.0092,
+    "browser_share": 0.9908,
+    "signal": "trace reaches an order-terminal service (checkout/payment); detected structurally via ORDER_TERMINAL_PATTERNS; total frontend root traces = 306,033"
+  },
+  "buyer_funnel_reconstructed": "checkout trace (reconstructed): frontend POST /api/checkout -> checkout PlaceOrder -> CartService/GetCart -> ProductCatalog/GetProduct xN -> Currency/Convert xN -> shipping get-quote -> quote getquote -> payment Charge -> shipping ship-order -> CartService/EmptyCart -> email. checkout p99 = 364 ms (healthy on this tenant, vs the 150 s pathological tail on oat05854).",
+  "buyer_steps": [
+    {
+      "id": "s1",
+      "service": "frontend",
+      "operation": "GET /api/products?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 42,
+        "p99Ms": 108,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s2",
+      "service": "frontend",
+      "operation": "POST /api/cart?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/cart.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "dependsOn": [
+        "s1"
+      ],
+      "baseline": {
+        "p50Ms": 4,
+        "p95Ms": 30,
+        "p99Ms": 108,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s1",
+          "extract": {
+            "from": "body_json",
+            "path": "$.[0].id"
+          },
+          "inject": {
+            "into": "body_field",
+            "as": "productId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "service": "frontend",
+      "operation": "GET /api/cart",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/cart.ts#handler",
+      "evidenceSource": "span",
+      "dependsOn": [
+        "s2"
+      ],
+      "baseline": {
+        "p50Ms": 8,
+        "p95Ms": 31,
+        "p99Ms": 73,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s2",
+          "extract": {
+            "from": "header",
+            "path": "set-cookie:session"
+          },
+          "inject": {
+            "into": "header",
+            "as": "cookie"
+          }
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "service": "frontend",
+      "operation": "POST /api/checkout?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/checkout.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "checkout",
+      "dependsOn": [
+        "s2"
+      ],
+      "baseline": {
+        "p50Ms": 7,
+        "p95Ms": 236,
+        "p99Ms": 364,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s2",
+          "extract": {
+            "from": "header",
+            "path": "set-cookie:session"
+          },
+          "inject": {
+            "into": "header",
+            "as": "cookie"
+          }
+        }
+      ]
+    }
+  ],
+  "browser_steps": [
+    {
+      "id": "s1",
+      "service": "frontend",
+      "operation": "GET /",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/index.tsx#Home",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 5,
+        "p95Ms": 12,
+        "p99Ms": 23,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s2",
+      "service": "frontend",
+      "operation": "GET /api/products?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 42,
+        "p99Ms": 108,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s3",
+      "service": "frontend",
+      "operation": "GET /api/data?contextKeys=telescopes",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/data/index.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 2,
+        "p95Ms": 42,
+        "p99Ms": 167,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s4",
+      "service": "frontend",
+      "operation": "GET /api/recommendations",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/recommendations/index.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 40,
+        "p95Ms": 84,
+        "p99Ms": 148,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s5",
+      "service": "frontend",
+      "operation": "GET /api/currency",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/currency/index.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 4,
+        "p95Ms": 44,
+        "p99Ms": 104,
+        "errorRate": 0.0
+      }
+    }
+  ]
+}

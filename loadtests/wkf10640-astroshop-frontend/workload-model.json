@@ -1,0 +1,339 @@
+{
+  "apiVersion": "loadtest.isi/v1alpha1",
+  "kind": "WorkloadModel",
+  "metadata": {
+    "name": "otel-astroshop-frontend-wkf10640",
+    "targetService": "frontend",
+    "environment": "wkf10640",
+    "generatedAt": "2026-10-12T00:00:00Z",
+    "source": {
+      "tool": "dtctl",
+      "timeframe": "-3h (2026-10-12, shared demo playground window)",
+      "timeframeNotes": "3h window on a shared demo playground; noise classifier dropped health/metrics scrapes, flagd polling, Kafka consumers, and the static image/_next asset routes; HTTP surface recovered from frontend server-span routes (spans-only; access logs unavailable).",
+      "queries": [
+        "fetch spans | filter request.is_root_span==true | sort start_time asc | summarize takeFirst(service.name),takeFirst(span.name) by trace.id | summarize count() by entryService,entryOp  (G1-C front-end discovery -> frontend dominant)",
+        "fetch logs | filter k8s.container.name=='istio-proxy' | summarize count()  (access-log availability probe -> 0 lines => spans-only)",
+        "fetch spans | filter span.kind=='server' && service.name=='frontend' | summarize count() by span.name  (HTTP route surface recovered from server spans)",
+        "fetch spans | filter request.is_root_span==true && service.name=='frontend' | summarize countDistinctExact(trace.id)  (total root traces = 306,033)",
+        "fetch spans | filter service.name=='checkout' || service.name=='payment' | summarize countDistinctExact(trace.id)  (order-terminal reach -> buyer_traces = 2,810)",
+        "fetch spans | filter span.kind=='server' && service.name=='frontend' | summarize percentile(duration,50/95/99),avg(duration),count(),countIf(is_failed) by span.name  (route + server baselines)",
+        "fetch spans | filter request.is_root_span==true && service.name=='frontend' | makeTimeseries count() interval:1m  (G3-B per-minute arrival curve, 181 bins, CoV 0.29)",
+        "fetch spans | filter span.kind=='server' && service.name=='frontend' | summarize sum(duration),count()  (observed concurrency busy-integral + server rate)",
+        "fetch spans | filter service.name=='product-catalog' && isNotNull(app.product.id) | summarize countDistinctExact(app.product.id),count() by app.product.id  (G4 cache keyCardinality = 10)",
+        "fetch events | filter event.type=='CUSTOM_DEPLOYMENT' | summarize count() by dt.entity.service  (window hygiene: frontend SERVICE-39720C1E0047A5C0 = 3 redeploys -> caveat)"
+      ],
+      "evidenceSources": [
+        "span"
+      ],
+      "accessLogAvailability": "unavailable",
+      "samplingRatio": 1.0
+    }
+  },
+  "spec": {
+    "arrivalProfile": {
+      "model": "open",
+      "stages": [
+        {
+          "duration": "162m",
+          "rate": 29.5098,
+          "shape": "ramp_up"
+        },
+        {
+          "duration": "1m",
+          "rate": 43.4,
+          "shape": "plateau"
+        },
+        {
+          "duration": "17m",
+          "rate": 39.2902,
+          "shape": "ramp_down"
+        }
+      ],
+      "littlesLawCheck": {
+        "expectedConcurrency": 3.6755,
+        "observedConcurrency": 3.6776,
+        "ratio": 0.9994
+      }
+    },
+    "journeys": [
+      {
+        "id": "browser",
+        "description": "Browser \u2014 search & browse (no order) - read-only, no order; reconstructed from the trace span-tree; folds entry ops: browser_browse_flow",
+        "weight": 0.9908,
+        "entrypoint": "GET /",
+        "codeRef": "src/frontend/pages/index.tsx#Home",
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "s1",
+            "service": "frontend",
+            "operation": "GET /",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/index.tsx#Home",
+            "evidenceSource": "span",
+            "baseline": {
+              "p50Ms": 5,
+              "p95Ms": 12,
+              "p99Ms": 23,
+              "errorRate": 0.0
+            }
+          },
+          {
+            "id": "s2",
+            "service": "frontend",
+            "operation": "GET /api/products?currencyCode=USD",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+            "evidenceSource": "span",
+            "payloadRef": "product",
+            "baseline": {
+              "p50Ms": 3,
+              "p95Ms": 42,
+              "p99Ms": 108,
+              "errorRate": 0.0
+            }
+          },
+          {
+            "id": "s3",
+            "service": "frontend",
+            "operation": "GET /api/data?contextKeys=telescopes",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/data/index.ts#handler",
+            "evidenceSource": "span",
+            "baseline": {
+              "p50Ms": 2,
+              "p95Ms": 42,
+              "p99Ms": 167,
+              "errorRate": 0.0
+            }
+          },
+          {
+            "id": "s4",
+            "service": "frontend",
+            "operation": "GET /api/recommendations",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/recommendations/index.ts#handler",
+            "evidenceSource": "span",
+            "baseline": {
+              "p50Ms": 40,
+              "p95Ms": 84,
+              "p99Ms": 148,
+              "errorRate": 0.0
+            }
+          },
+          {
+            "id": "s5",
+            "service": "frontend",
+            "operation": "GET /api/currency",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/currency/index.ts#handler",
+            "evidenceSource": "span",
+            "baseline": {
+              "p50Ms": 4,
+              "p95Ms": 44,
+              "p99Ms": 104,
+              "errorRate": 0.0
+            }
+          }
+        ],
+        "baseline": {
+          "p50Ms": 5,
+          "p95Ms": 84,
+          "p99Ms": 148,
+          "errorRate": 0.0
+        }
+      },
+      {
+        "id": "buyer",
+        "description": "Buyer \u2014 browse, add to cart, place order - places an order; reconstructed from the trace span-tree; folds entry ops: buyer_checkout_flow",
+        "weight": 0.0092,
+        "entrypoint": "GET /api/products?currencyCode=USD",
+        "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "s1",
+            "service": "frontend",
+            "operation": "GET /api/products?currencyCode=USD",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+            "evidenceSource": "span",
+            "payloadRef": "product",
+            "baseline": {
+              "p50Ms": 3,
+              "p95Ms": 42,
+              "p99Ms": 108,
+              "errorRate": 0.0
+            }
+          },
+          {
+            "id": "s2",
+            "service": "frontend",
+            "operation": "POST /api/cart?currencyCode=USD",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/cart.ts#handler",
+            "evidenceSource": "span",
+            "payloadRef": "product",
+            "dependsOn": [
+              "s1"
+            ],
+            "baseline": {
+              "p50Ms": 4,
+              "p95Ms": 30,
+              "p99Ms": 108,
+              "errorRate": 0.0
+            },
+            "correlates": [
+              {
+                "sourceStepId": "s1",
+                "extract": {
+                  "from": "body_json",
+                  "path": "$.[0].id"
+                },
+                "inject": {
+                  "into": "body_field",
+                  "as": "productId"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "service": "frontend",
+            "operation": "GET /api/cart",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/cart.ts#handler",
+            "evidenceSource": "span",
+            "dependsOn": [
+              "s2"
+            ],
+            "baseline": {
+              "p50Ms": 8,
+              "p95Ms": 31,
+              "p99Ms": 73,
+              "errorRate": 0.0
+            },
+            "correlates": [
+              {
+                "sourceStepId": "s2",
+                "extract": {
+                  "from": "header",
+                  "path": "set-cookie:session"
+                },
+                "inject": {
+                  "into": "header",
+                  "as": "cookie"
+                }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "service": "frontend",
+            "operation": "POST /api/checkout?currencyCode=USD",
+            "callType": "http",
+            "codeRef": "src/frontend/pages/api/checkout.ts#handler",
+            "evidenceSource": "span",
+            "payloadRef": "checkout",
+            "dependsOn": [
+              "s2"
+            ],
+            "baseline": {
+              "p50Ms": 7,
+              "p95Ms": 236,
+              "p99Ms": 364,
+              "errorRate": 0.0
+            },
+            "correlates": [
+              {
+                "sourceStepId": "s2",
+                "extract": {
+                  "from": "header",
+                  "path": "set-cookie:session"
+                },
+                "inject": {
+                  "into": "header",
+                  "as": "cookie"
+                }
+              }
+            ]
+          }
+        ],
+        "baseline": {
+          "p50Ms": 3,
+          "p95Ms": 236,
+          "p99Ms": 364,
+          "errorRate": 0.0
+        }
+      }
+    ],
+    "payloads": {
+      "product": {
+        "fields": [
+          {
+            "name": "productId",
+            "type": "enum",
+            "generator": "const",
+            "values": [
+              "2ZYFJ3GM2N",
+              "L9ECAV7KIM",
+              "OLJCESPC7Z",
+              "6E92ZMYYFZ",
+              "1YMWWN1N4O",
+              "9SIQT8TOJO",
+              "LS4PSXUNUM",
+              "HQTGWGPNH4",
+              "66VCHSJNUP",
+              "0PUK6V6EV0"
+            ],
+            "distribution": "zipf"
+          }
+        ],
+        "seed": 42,
+        "cacheProfile": {
+          "targetHitRatio": 0.99,
+          "keyCardinality": 10,
+          "distributionAlpha": 0.05,
+          "backingStoreSeeded": true
+        }
+      },
+      "checkout": {
+        "fields": [
+          {
+            "name": "email",
+            "type": "string",
+            "generator": "faker:email"
+          },
+          {
+            "name": "creditCardNumber",
+            "type": "string",
+            "generator": "faker:ccNumber"
+          },
+          {
+            "name": "currencyCode",
+            "type": "enum",
+            "generator": "const",
+            "values": [
+              "USD",
+              "EUR",
+              "GBP",
+              "JPY"
+            ],
+            "distribution": "weighted"
+          }
+        ],
+        "seed": 42
+      }
+    },
+    "caps": {
+      "maxRps": 60,
+      "maxVus": 50,
+      "maxDuration": "45m"
+    },
+    "coverage": 1.0
+  },
+  "status": {
+    "revision": 1,
+    "hash": "sha256:cdd5294c0c0dd008394623b6eef41a4fea8641cfbbf64604714e6a6c1d9639e3"
+  }
+}
