@@ -1,0 +1,157 @@
+{
+  "apiVersion": "loadtest.isi/v1alpha1",
+  "kind": "WorkloadModel",
+  "metadata": {
+    "name": "easytrade-frontendreverseproxy-wkf10640",
+    "targetService": "easytrade-frontendreverseproxy",
+    "environment": "wkf10640",
+    "generatedAt": "2026-10-12T00:00:00Z",
+    "source": {
+      "tool": "dtctl",
+      "timeframe": "-24h (2026-10-11T11:00Z \u2192 2026-10-12T11:00Z; wider peak-inclusive window per \u00a711 R1, vs ISI-5684's 3h)",
+      "timeframeNotes": "24h peak-inclusive window on a shared demo playground (wider than ISI-5684's 3h per R1); noise classifier dropped health/metrics scrapes, background polling and static assets; HTTP surface recovered from server-span routes (spans-only; access logs unavailable).",
+      "queries": [
+        "fetch spans,from:-24h | filter request.is_root_span==true and startsWith(service.name,'easytrade') | summarize count(),by:{service.name,span.name}  (easytrade entry surface; browser edge=frontendreverseproxy; backend svcs root separately via polling)",
+        "fetch logs,from:-24h | filter k8s.container.name=='istio-proxy' | summarize count()  (access-log probe -> unavailable, spans-only)",
+        "fetch spans,from:-24h | filter span.kind=='server' and service.name=='easytrade-frontendreverseproxy' and (span.name=='GET' or span.name=='POST') | summarize percentile(duration,50/95/99),count(),countIf(is_failed),by:{span.name}  (Viewer GET p95 366ms / Trader POST p95 63ms)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='easytrade-frontendreverseproxy' | summarize countDistinctApprox(trace.id)  (119,955 edge root traces)",
+        "fetch spans,from:-24h | filter (service.name=='easytrade-credit-card-order-service' and span.kind=='server' and startsWith(span.name,'POST')) or (service.name=='easytrade-engine' and span.kind=='server' and span.name=='POST') | summarize countDistinctApprox(trace.id)  (trader/terminal reach = 1,539 traces)",
+        "fetch spans,from:-24h | filter service.name=='easytrade-engine' and span.kind=='server' and span.name=='POST' | summarize percentile(duration,50/95/99),count()  (trade-engine POST p50 1.2ms p95 2.4ms p99 4.5ms)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='easytrade-frontendreverseproxy' | makeTimeseries count(),interval:1m  (arrival curve, 1438 bins, CoV 0.150)",
+        "fetch spans,from:-24h | filter span.kind=='server' and service.name=='easytrade-frontendreverseproxy' | summarize sum(duration),count()  (busy-integral 6.905e12 ns -> concurrency 0.080; rate 1.512 tps)"
+      ],
+      "evidenceSources": [
+        "span"
+      ],
+      "accessLogAvailability": "unavailable",
+      "samplingRatio": 1.0
+    }
+  },
+  "spec": {
+    "arrivalProfile": {
+      "model": "open",
+      "stages": [
+        {
+          "duration": "1436m",
+          "rate": 1.5133,
+          "shape": "steady"
+        },
+        {
+          "duration": "2m",
+          "rate": 0.0,
+          "shape": "ramp_down"
+        }
+      ],
+      "littlesLawCheck": {
+        "expectedConcurrency": 0.0799,
+        "observedConcurrency": 0.0799,
+        "ratio": 1.0002
+      }
+    },
+    "journeys": [
+      {
+        "id": "viewer",
+        "description": "Viewer \u2014 browses prices, offers & account balances (read-only); reconstructed from the trace span-tree over a 24h window. Folds entry ops: viewer_browse_flow.",
+        "weight": 0.9872,
+        "entrypoint": "GET (app shell)",
+        "unlinked": true,
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "home",
+            "service": "easytrade-frontendreverseproxy",
+            "operation": "GET (app shell)",
+            "callType": "http"
+          },
+          {
+            "id": "offers",
+            "service": "easytrade-offerservice",
+            "operation": "GET /api/offers/:platform",
+            "callType": "http"
+          },
+          {
+            "id": "prices",
+            "service": "easytrade-pricing-service",
+            "operation": "GET /v1/prices/latest",
+            "callType": "http"
+          },
+          {
+            "id": "products",
+            "service": "easytrade-manager",
+            "operation": "GET api/Products/GetProducts",
+            "callType": "http"
+          },
+          {
+            "id": "balance",
+            "service": "easytrade-accountservice",
+            "operation": "GET /accounts/{accountId}",
+            "callType": "http"
+          }
+        ],
+        "baseline": {
+          "p50Ms": 13.5,
+          "p95Ms": 366.0,
+          "p99Ms": 474.0,
+          "errorRate": 0.0
+        }
+      },
+      {
+        "id": "trader",
+        "description": "Trader \u2014 views account then executes a trade / credit-card order (write); reconstructed from the trace span-tree over a 24h window. Folds entry ops: trader_order_flow.",
+        "weight": 0.0128,
+        "entrypoint": "GET (app shell)",
+        "unlinked": true,
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "home",
+            "service": "easytrade-frontendreverseproxy",
+            "operation": "GET (app shell)",
+            "callType": "http"
+          },
+          {
+            "id": "account",
+            "service": "easytrade-accountservice",
+            "operation": "GET /accounts/{accountId}",
+            "callType": "http"
+          },
+          {
+            "id": "price",
+            "service": "easytrade-pricing-service",
+            "operation": "GET /v1/prices/latest",
+            "callType": "http"
+          },
+          {
+            "id": "trade",
+            "service": "easytrade-engine",
+            "operation": "POST (execute trade)",
+            "callType": "http"
+          },
+          {
+            "id": "order",
+            "service": "easytrade-credit-card-order-service",
+            "operation": "POST /v1/orders/",
+            "callType": "http"
+          }
+        ],
+        "baseline": {
+          "p50Ms": 13.8,
+          "p95Ms": 63.2,
+          "p99Ms": 157.2,
+          "errorRate": 0.0
+        }
+      }
+    ],
+    "payloads": {},
+    "caps": {
+      "maxRps": 10,
+      "maxVus": 20,
+      "maxDuration": "45m"
+    },
+    "coverage": 1.0
+  },
+  "status": {
+    "revision": 1,
+    "hash": "sha256:235cf414dc40a8723ef14760c6e279552abd7ff1153e5c2e5a924562cfc53884"
+  }
+}

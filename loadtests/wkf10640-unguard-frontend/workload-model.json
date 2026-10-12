@@ -1,0 +1,163 @@
+{
+  "apiVersion": "loadtest.isi/v1alpha1",
+  "kind": "WorkloadModel",
+  "metadata": {
+    "name": "unguard-frontend-wkf10640",
+    "targetService": "unguard-frontend",
+    "environment": "wkf10640",
+    "generatedAt": "2026-10-12T00:00:00Z",
+    "source": {
+      "tool": "dtctl",
+      "timeframe": "-24h (2026-10-11T11:00Z \u2192 2026-10-12T11:00Z; wider peak-inclusive window per \u00a711 R1, vs ISI-5684's 3h)",
+      "timeframeNotes": "24h peak-inclusive window on a shared demo playground (wider than ISI-5684's 3h per R1); noise classifier dropped health/metrics scrapes, background polling and static assets; HTTP surface recovered from server-span routes (spans-only; access logs unavailable).",
+      "queries": [
+        "fetch spans,from:-24h | filter request.is_root_span==true | summarize count(),by:{service.name} | sort desc  (G1 app enumeration -> unguard family discovered)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and startsWith(service.name,'unguard') | summarize count(),by:{service.name,span.name}  (unguard entry-route surface; front-end=unguard-frontend)",
+        "fetch logs,from:-24h | filter k8s.container.name=='istio-proxy' | summarize count()  (access-log probe -> unavailable, spans-only)",
+        "fetch spans,from:-24h | filter span.kind=='server' and service.name=='unguard-frontend' | summarize percentile(duration,50/95/99),avg(duration),count(),countIf(is_failed)  (Reader/front-end server baseline: p50 22.4ms p95 3953.8ms p99 6649.1ms, 0 fail)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='unguard-frontend' | summarize countDistinctExact(trace.id)  (638,129 front-end root traces)",
+        "fetch spans,from:-24h | filter (service.name=='unguard-microblog-service' and span.name=='POST /post') or (service.name=='unguard-like-service' and span.kind=='server' and span.name=='POST') | summarize countDistinctApprox(trace.id)  (engager/write reach = 8,666 traces)",
+        "fetch spans,from:-24h | filter service.name=='unguard-microblog-service' and span.name=='POST /post' | summarize percentile(duration,50/95/99),count(),countIf(is_failed)  (Engager defining step: p50 27.5ms p95 84.9ms p99 161.4ms)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='unguard-frontend' | makeTimeseries count(),interval:1m  (arrival curve, 1439 bins, CoV 0.182 -> ramped)",
+        "fetch spans,from:-24h | filter span.kind=='server' and service.name=='unguard-frontend' | summarize sum(duration),count()  (busy-integral 1.183e15 ns -> concurrency 13.69; rate 20.50 tps)"
+      ],
+      "evidenceSources": [
+        "span"
+      ],
+      "accessLogAvailability": "unavailable",
+      "samplingRatio": 1.0
+    }
+  },
+  "spec": {
+    "arrivalProfile": {
+      "model": "open",
+      "stages": [
+        {
+          "duration": "595m",
+          "rate": 7.3724,
+          "shape": "ramp_up"
+        },
+        {
+          "duration": "1m",
+          "rate": 10.5833,
+          "shape": "plateau"
+        },
+        {
+          "duration": "844m",
+          "rate": 7.4017,
+          "shape": "ramp_down"
+        }
+      ],
+      "littlesLawCheck": {
+        "expectedConcurrency": 13.6921,
+        "observedConcurrency": 13.6922,
+        "ratio": 1.0
+      }
+    },
+    "journeys": [
+      {
+        "id": "reader",
+        "description": "Reader \u2014 browses timeline, profiles & ads (read-only); reconstructed from the trace span-tree over a 24h window. Folds entry ops: reader_browse_flow.",
+        "weight": 0.9864,
+        "entrypoint": "GET /",
+        "unlinked": true,
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "land",
+            "service": "unguard-frontend",
+            "operation": "GET /",
+            "callType": "http"
+          },
+          {
+            "id": "timeline",
+            "service": "unguard-microblog-service",
+            "operation": "GET /timeline",
+            "callType": "http"
+          },
+          {
+            "id": "ad",
+            "service": "unguard-ad-service",
+            "operation": "GET /ad-service",
+            "callType": "http"
+          },
+          {
+            "id": "bio",
+            "service": "unguard-profile-service",
+            "operation": "GET /user/{id}/bio",
+            "callType": "http"
+          },
+          {
+            "id": "membership",
+            "service": "unguard-membership-service",
+            "operation": "GET Membership-service/{userid}",
+            "callType": "http"
+          }
+        ],
+        "baseline": {
+          "p50Ms": 22.4,
+          "p95Ms": 3953.8,
+          "p99Ms": 6649.1,
+          "errorRate": 0.0
+        }
+      },
+      {
+        "id": "engager",
+        "description": "Engager \u2014 authenticated user posts / likes content (write path); reconstructed from the trace span-tree over a 24h window. Folds entry ops: engager_write_flow.",
+        "weight": 0.0136,
+        "entrypoint": "GET /",
+        "unlinked": true,
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "land",
+            "service": "unguard-frontend",
+            "operation": "GET /",
+            "callType": "http"
+          },
+          {
+            "id": "login",
+            "service": "unguard-user-auth-service",
+            "operation": "POST /user/username",
+            "callType": "http"
+          },
+          {
+            "id": "timeline",
+            "service": "unguard-microblog-service",
+            "operation": "GET /timeline",
+            "callType": "http"
+          },
+          {
+            "id": "post",
+            "service": "unguard-microblog-service",
+            "operation": "POST /post",
+            "callType": "http"
+          },
+          {
+            "id": "like",
+            "service": "unguard-like-service",
+            "operation": "POST (like)",
+            "callType": "http"
+          }
+        ],
+        "baseline": {
+          "p50Ms": 27.5,
+          "p95Ms": 84.9,
+          "p99Ms": 161.4,
+          "errorRate": 0.0
+        }
+      }
+    ],
+    "payloads": {},
+    "caps": {
+      "maxRps": 20,
+      "maxVus": 40,
+      "maxDuration": "45m"
+    },
+    "coverage": 1.0
+  },
+  "status": {
+    "revision": 1,
+    "hash": "sha256:be5067c6955962fe1a9b1cda9d6dc929ce7afd3cc5a3dfcc8dafb45b6e887d73"
+  }
+}

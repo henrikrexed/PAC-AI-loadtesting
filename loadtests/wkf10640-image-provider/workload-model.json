@@ -1,0 +1,114 @@
+{
+  "apiVersion": "loadtest.isi/v1alpha1",
+  "kind": "WorkloadModel",
+  "metadata": {
+    "name": "image-presign-pipeline-wkf10640",
+    "targetService": "image-provider",
+    "environment": "wkf10640",
+    "generatedAt": "2026-10-12T00:00:00Z",
+    "source": {
+      "tool": "dtctl",
+      "timeframe": "-24h (2026-10-11T11:00Z \u2192 2026-10-12T11:00Z; wider peak-inclusive window per \u00a711 R1, vs ISI-5684's 3h)",
+      "timeframeNotes": "24h peak-inclusive window on a shared demo playground (wider than ISI-5684's 3h per R1); noise classifier dropped health/metrics scrapes, background polling and static assets; HTTP surface recovered from server-span routes (spans-only; access logs unavailable).",
+      "queries": [
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='image-provider' | summarize count(),by:{span.name}  (single entry op 'image-provider', 409k root spans)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='image-provider' | summarize percentile(duration,50/95/99),avg(duration)  (ENTRY SPAN DEGENERATE: ~317 ns, p50/95/99=0 -> thin async wrapper; real work in S3/Lambda children)",
+        "fetch spans,from:-24h | filter span.name=='S3:GetObject get presign URL' | summarize count(),roots=countIf(is_root_span),avg(duration),percentile(duration,50/95/99),by:{dt.entity.service}  (real image pipeline entity SERVICE-5A0CD2879D2F37BE; p50 1.30ms p95 2.07ms p99 18.06ms; 0 roots -> child spans)",
+        "fetch spans,from:-24h | filter span.name=='S3:GetObject get presign URL' | summarize sum(duration),count()  (busy-integral 1.494e12 ns -> concurrency 0.0173; rate 10.27 tps; mean 1.684ms)",
+        "fetch logs,from:-24h | filter k8s.container.name=='istio-proxy' | summarize count()  (access-log probe -> unavailable, spans-only)",
+        "fetch spans,from:-24h | filter request.is_root_span==true and service.name=='image-provider' | makeTimeseries count(),interval:1m  (arrival curve, 1439 bins, CoV 0.170 -> ramped)"
+      ],
+      "evidenceSources": [
+        "span"
+      ],
+      "accessLogAvailability": "unavailable",
+      "samplingRatio": 1.0
+    }
+  },
+  "spec": {
+    "arrivalProfile": {
+      "model": "open",
+      "stages": [
+        {
+          "duration": "1146m",
+          "rate": 4.77,
+          "shape": "ramp_up"
+        },
+        {
+          "duration": "1m",
+          "rate": 10.05,
+          "shape": "plateau"
+        },
+        {
+          "duration": "293m",
+          "rate": 4.6194,
+          "shape": "ramp_down"
+        }
+      ],
+      "littlesLawCheck": {
+        "expectedConcurrency": 0.0173,
+        "observedConcurrency": 0.0173,
+        "ratio": 0.9998
+      }
+    },
+    "journeys": [
+      {
+        "id": "image-fetch",
+        "description": "Image fetch \u2014 presign (Lambda) + S3 retrieve of a product image; reconstructed from the trace span-tree over a 24h window. Folds entry ops: image_presign_fetch.",
+        "weight": 1.0,
+        "entrypoint": "GET image (entry wrapper)",
+        "unlinked": true,
+        "evidenceSource": "span",
+        "steps": [
+          {
+            "id": "entry",
+            "service": "image-provider",
+            "operation": "GET image (entry wrapper)",
+            "callType": "http"
+          },
+          {
+            "id": "presign",
+            "service": "images-presign-lambda",
+            "operation": "Invoke lambda /images/presign",
+            "callType": "http"
+          },
+          {
+            "id": "bucket",
+            "service": "images-presign-lambda",
+            "operation": "DynamoDB:GetItem - get product bucket",
+            "callType": "db"
+          },
+          {
+            "id": "head",
+            "service": "images-presign-lambda",
+            "operation": "S3:HeadObject check if image for screen size exists",
+            "callType": "http"
+          },
+          {
+            "id": "get",
+            "service": "images-presign-lambda",
+            "operation": "S3:GetObject get presign URL",
+            "callType": "http"
+          }
+        ],
+        "baseline": {
+          "p50Ms": 1.3,
+          "p95Ms": 2.07,
+          "p99Ms": 18.06,
+          "errorRate": 0.0
+        }
+      }
+    ],
+    "payloads": {},
+    "caps": {
+      "maxRps": 20,
+      "maxVus": 10,
+      "maxDuration": "45m"
+    },
+    "coverage": 1.0
+  },
+  "status": {
+    "revision": 1,
+    "hash": "sha256:bb5a994b72557a40676a76dc194f9c7f35d6f5dca77b3af1fedf7e0193c9a486"
+  }
+}
