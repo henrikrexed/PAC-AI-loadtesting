@@ -1,0 +1,15 @@
+# Pins are a known-good baseline; the smoke test (README §5) validates the CrewAI LLM.call
+# signature that TracedLLM overrides. Bump within the same minor if the smoke test flags drift.
+# setuptools: crewai 0.86.0 imports pkg_resources at runtime, and slim base images / PEP-668
+# envs no longer ship it — pin it explicitly so the app starts.
+setuptools==75.6.0
+crewai==0.86.0
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+# pydantic >=2.11: openai 2.x ships realtime types using typing_extensions.ReadOnly, whose
+# pydantic-core schema support landed in 2.11 (2.10.3 raises PydanticSchemaGenerationError on
+# crewai->litellm->openai import).
+pydantic>=2.11,<3
+opentelemetry-api==1.29.0
+opentelemetry-sdk==1.29.0
+opentelemetry-exporter-otlp-proto-http==1.29.0
