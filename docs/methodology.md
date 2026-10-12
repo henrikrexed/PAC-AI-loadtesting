@@ -714,6 +714,21 @@ Invariant: **V1 approval hash-bound to model revision** is the anchor of the who
 6. Everything committed (P2): model, scripts, payloads, configs, diffs, reports.
 7. **Synthetic-tag promotion (O11y prerequisite for P4/§3.5).** The OTel pipeline MUST copy baggage `synthetic` onto spans as a queryable attribute — via the SDK baggage span processor or a collector `transform`/`baggage` processor — and a warm-up probe MUST confirm a non-zero `synthetic == true` span count before ANALYZE runs. Without this, `synthetic=true` is invisible to DQL and test/prod telemetry cannot be separated.
 
+### 7.1 Environment credentials — tokens to create for a new test environment
+
+To run the loop against a **separate (isolated) environment**, create the token(s) **in that environment's own tenant** (tokens are tenant-scoped; this is the isolation boundary) with least privilege. Two distinct Dynatrace credentials are needed — one **read** (SCOPE + ANALYZE) and one **ingest** (EXECUTE) — because they are opposite directions and should not be combined:
+
+| Purpose | Stage | Token type | Minimum scopes | Where used |
+|---|---|---|---|---|
+| **Query telemetry (Grail/DQL)** | SCOPE extract + ANALYZE diff | **Dynatrace Platform token** (`dt0s16.*`) — created under *Account Management → Platform tokens* (an OAuth client `dt0s02.*` also works; dtctl supports both) | read-only Grail: `storage:spans:read`, `storage:logs:read`, `storage:metrics:read`, `storage:events:read`, `storage:bizevents:read`, `storage:entities:read`, `storage:buckets:read` (grant only those your DQL `fetch`es touch; `storage:spans:read` is the one hard requirement) | `dtctl` profile/context for the tenant |
+| **Ingest synthetic telemetry (OTLP)** | EXECUTE | **Dynatrace API token** (`dt0c01.*`) — created under *Access Tokens* | `openTelemetryTrace.ingest` (+ `metrics.ingest`, `logs.ingest` if the run emits them) | OTel collector / k6 exporter: `Authorization: Api-Token <token>` to `https://<env>/api/v2/otlp/v1/traces` |
+
+Notes:
+- **Read ≠ ingest:** the platform/OAuth read token cannot ingest and the `dt0c01` ingest token cannot run DQL — create both, keep each minimal.
+- **Isolation:** point `dtctl` at a **new context** for the test tenant and set the collector/k6 `DT_API_TOKEN` + OTLP endpoint to that tenant; nothing then touches your other environments.
+- **Target-app auth is separate** from any Dynatrace token — if the system-under-test needs login, that credential is app-specific and belongs in the k6 `run-config`/payloads, not a platform token.
+- Secrets handling per §5.5: tokens live in the runner secret store, never committed (and the ingest token is a secret even though its scope is narrow).
+
 ---
 
 ## 8. Skill mapping (input to Phase 3, [ISI-4046](/ISI/issues/ISI-4046))
