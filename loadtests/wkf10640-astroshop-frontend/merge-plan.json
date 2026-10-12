@@ -1,0 +1,61 @@
+{
+  "entries": [
+    {
+      "key": "astroshop (browser journey)",
+      "source": "rum",
+      "rumRate": 25.9377,
+      "spanRate": 33.0308,
+      "extrapolationFactor": 1.2735,
+      "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.2735 to the unsampled span-observed volume (33.0308/s)."
+    },
+    {
+      "key": "unguard-frontend",
+      "source": "span",
+      "rumRate": null,
+      "spanRate": 6.5956,
+      "extrapolationFactor": null,
+      "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+    },
+    {
+      "key": "image-provider",
+      "source": "span",
+      "rumRate": null,
+      "spanRate": 4.84,
+      "extrapolationFactor": null,
+      "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+    },
+    {
+      "key": "tms-agent-service (A2A)",
+      "source": "span",
+      "rumRate": null,
+      "spanRate": 0.138,
+      "extrapolationFactor": null,
+      "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+    },
+    {
+      "key": "smartfreight-agent-service (A2A)",
+      "source": "span",
+      "rumRate": null,
+      "spanRate": 0.0041,
+      "extrapolationFactor": null,
+      "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+    }
+  ],
+  "summary": {
+    "keys": 5,
+    "rumPrimaryKeys": 1,
+    "spanFallbackKeys": 4,
+    "droppedRumOnlyKeys": 0,
+    "rumDrivenShare": 0.7405,
+    "meanExtrapolationFactor": 1.2735,
+    "extrapolationFactorRange": [
+      1.2735,
+      1.2735
+    ]
+  },
+  "_meta": {
+    "source": "ISI-5693 live DQL wkf10640 tenant-b readonly, 24h ending 2026-10-12T20:37Z",
+    "window_seconds": 86400.0,
+    "note": "Astroshop browser journey is RUM-primary; extrapolationFactor=span/rum=1.27 scales the sampled RUM rate to the unsampled span truth. RUM-absent services -> span-order HTTP scenarios. Per-endpoint overlap + ordered navigation + exact think-times await user.events (storage:user.events:read)."
+  }
+}

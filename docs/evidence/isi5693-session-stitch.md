@@ -242,11 +242,31 @@ corrects the sampling. Worked example shape: RUM sees an endpoint at 2/s, spans 
 - **RUM-primary** (browser user journeys): Astroshop, EasyTrade, Astroshop-PureOTel, Astroshop_Android — the `user.sessions`/`user.events` surface (§7).
 - **Span HTTP fallback** (no browser RUM): unguard, image-provider, smartfreight/tms A2A agents, cron pollers, and all backend/internal service-to-service calls.
 
-**Open dependency for the *real* merged model:** the authoritative per-endpoint RUM rates (to
-compute the overlap set and the per-endpoint `factor`) live in `user.events` — gated on
-`storage:user.events:read` (§7.2). The reconciler + extrapolation math are done and tested; they
-light up unchanged the moment that scope lands. Span side and RUM session-shape side are already
-extractable today.
+### 8.1 Live merged plan — Astroshop (real data, no `user.events` needed)
+
+Computed from accessible data today (`loadtests/wkf10640-astroshop-frontend/merge-plan.json`,
+24h): RUM request volume from `user.sessions` vs the unsampled span request volume.
+
+| key | source | rum req/s | span req/s | **extrapolation factor** |
+|---|---|---:|---:|---:|
+| Astroshop (browser journey) | **rum** | 25.94 | 33.03 | **1.27** (= 2,853,862 / 2,241,018) |
+| unguard-frontend | span | — | 6.60 | — (HTTP scenario) |
+| image-provider | span | — | 4.84 | — (HTTP scenario) |
+| tms-agent-service (A2A) | span | — | 0.14 | — (HTTP scenario) |
+| smartfreight-agent-service (A2A) | span | — | 0.004 | — (HTTP scenario) |
+
+Summary: 1 RUM-primary key, 4 span-fallback, 0 rum-only (dropped), **rumDrivenShare 0.74**. The
+**1.27×** factor is live proof of the board's "beware the sampling → extrapolate": RUM captures
+~79 % of Astroshop's frontend requests, so the RUM-primary journey is driven ×1.27 to reproduce
+the unsampled truth. This needs only `user.sessions` + spans — **not** `user.events`.
+
+### 8.2 What still needs `user.events` (the one remaining gate)
+
+The step above merges at **request-volume** granularity. The finer piece — the **ordered**
+per-session navigation (exact action sequence + measured per-action think-times + the real
+pages, and per-endpoint overlap/factors) — lives in `user.events`, gated on
+`storage:user.events:read` (§7.2). The reconciler + extrapolation math are done, tested, and now
+demonstrated live; they light up unchanged the moment that scope lands.
 
 ## Deliverables (shipped)
 
