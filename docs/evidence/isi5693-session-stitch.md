@@ -217,6 +217,37 @@ real browse/cart/checkout use cases per session).
 from `user.events` grouped by `dt.rum.session.id` — the full R5 closure, Grail-native, no classic
 token, no PII beyond opaque session ids (§7.1 PII scrub still applies to geo/user fields).
 
+## 8. Dual-source merge — RUM ⟗ spans (board design, 2026-10-12)
+
+Board directive: *"both-sides analysis — RUM and span — then merge. If the requests are common
+with RUM, use mainly the user session (beware the sampling → extrapolate). For spans with no RUM
+match, generate an HTTP-based scenario."* `scripts/source_merge.py` is the deterministic
+reconciler (`reconcile()` / `merge_plan()`), pure and tested.
+
+**Per-key merge rules:**
+
+| overlap | source | volume | rationale |
+|---|---|---|---|
+| **common** (in RUM *and* spans) | **RUM** user session (ordered journey + think-times) | `rum_rate × factor`, `factor = span_rate / rum_rate` | RUM is the session-accurate signal; the span side is **unsampled** here (`dt.system.sampling_ratio=1.0`), so the overlap ratio *measures* RUM's effective sampling and extrapolates the RUM-primary journey up to the real volume — no separate sampling-rate config needed |
+| **span-only** (no RUM match) | **span** HTTP scenario (tiers 2a/2b) | span_rate | backend/internal gRPC + non-browser apps the RUM agent never sees (unguard, image-provider, A2A, cron) |
+| **rum-only** (RUM, no server span) | RUM as-is (factor 1.0, flagged) | rum_rate | pure client-side activity; not span-extrapolatable |
+
+**Self-calibrating sampling.** No RUM sampling-rate metric is exposed on this token
+(`dt.sfm.*rum*` has only `total_sessions`), so a configured rate is unavailable — but the merge
+does not need one: `factor = span_rate / rum_rate` on any shared endpoint both reveals and
+corrects the sampling. Worked example shape: RUM sees an endpoint at 2/s, spans (truth) at 8/s →
+`factor = 4` → the RUM-primary journey is driven 4× to reproduce real load.
+
+**Both-sides coverage on wkf10640 (what routes where):**
+- **RUM-primary** (browser user journeys): Astroshop, EasyTrade, Astroshop-PureOTel, Astroshop_Android — the `user.sessions`/`user.events` surface (§7).
+- **Span HTTP fallback** (no browser RUM): unguard, image-provider, smartfreight/tms A2A agents, cron pollers, and all backend/internal service-to-service calls.
+
+**Open dependency for the *real* merged model:** the authoritative per-endpoint RUM rates (to
+compute the overlap set and the per-endpoint `factor`) live in `user.events` — gated on
+`storage:user.events:read` (§7.2). The reconciler + extrapolation math are done and tested; they
+light up unchanged the moment that scope lands. Span side and RUM session-shape side are already
+extractable today.
+
 ## Deliverables (shipped)
 
 - `skills/workload-model/scripts/session_stitch.py` — pure Path B module: `stitch()`,
@@ -236,6 +267,8 @@ token, no PII beyond opaque session ids (§7.1 PII scrub still applies to geo/us
 - **`skills/workload-model/fixtures/wkf10640_rum_sessions.json`** — live per-app `user.sessions`
   facts (35,679 sessions / 5 apps). **`tests/test_rum_sessions.py`** — 6 tests.
 - Additive `source.rumSessionCoverage` in `schema.json`.
+- **`skills/workload-model/scripts/source_merge.py`** — dual-source RUM⟗span reconciler (§8):
+  `reconcile()` / `merge_plan()` with self-calibrating span/rum extrapolation. **`tests/test_source_merge.py`** — 6 tests.
 
 ## Methodology note for BigBoss (fold into §3.1 step 2c)
 
