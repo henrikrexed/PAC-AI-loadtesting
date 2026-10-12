@@ -59,6 +59,31 @@
                   }
                 }
               }
+            },
+            "rumSessionCoverage": {
+              "type": "object",
+              "description": "SCOPE §3.1 step 2c (RUM, Grail-native): coverage from Dynatrace `user.sessions`/`user.events` (dt.rum.session.id). Supersedes the ISI-5691 NO-GO. hasRumSignal=true ⇒ real user-session population is DQL-reachable. Ordered journeys + exact think-times require `user.events` (OAuth scope storage:user.events:read).",
+              "required": ["hasRumSignal", "totalSessions"],
+              "properties": {
+                "hasRumSignal": { "type": "boolean" },
+                "totalSessions": { "type": "integer" },
+                "userEventsAccessible": { "type": "boolean", "description": "false ⇒ ordered-journey upgrade is scope-gated on storage:user.events:read" },
+                "apps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["app", "sessions"],
+                    "properties": {
+                      "app": { "type": "string" },
+                      "type": { "enum": ["web", "mobile", "unknown"] },
+                      "sessions": { "type": "integer" },
+                      "actionsP50": { "type": "number" },
+                      "durationP50Seconds": { "type": "number" },
+                      "bounceRate": { "type": "number" }
+                    }
+                  }
+                }
+              }
             }
           }
         }

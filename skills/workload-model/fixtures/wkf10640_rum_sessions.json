@@ -1,0 +1,13 @@
+{
+  "_source": "ISI-5693 board review — live DQL on wkf10640 via dtctl --context tenant-b (readonly), 24h window ending 2026-10-12T14:36Z",
+  "tenant": "wkf10640",
+  "object": "user.sessions (Grail-native RUM; user.events is scope-gated on storage:user.events:read)",
+  "totalRumSessions24h": 35679,
+  "per_app": [
+    {"app": "Astroshop",                   "type": "web",    "sessions": 17114, "actionsP50": 8, "actionsP99": 9, "durationP50Seconds": 15, "durationP90Seconds": 26, "gapP50Seconds": 2,  "bounceRate": 0.0006, "errorSessions": 578},
+    {"app": "EasyTrade_1",                  "type": "web",    "sessions": 7865,  "actionsP50": 9, "actionsP99": 9, "durationP50Seconds": 26, "durationP90Seconds": 31, "gapP50Seconds": 3,  "bounceRate": 0.0,    "errorSessions": 26},
+    {"app": "Astroshop_Pure_OpenTelemetry", "type": "web",   "sessions": 5197,  "actionsP50": 6, "actionsP99": 8, "durationP50Seconds": 75, "durationP90Seconds": 106, "gapP50Seconds": 15, "bounceRate": 0.0137, "errorSessions": 5197},
+    {"app": "Astroshop_Android",            "type": "mobile", "sessions": 2905,  "actionsP50": 1, "actionsP99": 3, "durationP50Seconds": 89, "durationP90Seconds": 178, "gapP50Seconds": 0,  "bounceRate": 0.0,    "errorSessions": 0}
+  ],
+  "note": "user.sessions gives session SHAPE (actions/session, duration, bounce) across the whole RUM population. Ordered per-action navigation + exact think-times + actual pages require user.events (needs storage:user.events:read on the tenant-b token). gapP50 = duration/(actions-1) is an APPROXIMATE pacing estimate, not a measured think-time."
+}

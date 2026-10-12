@@ -59,8 +59,16 @@ deterministic path. **dtctl carries SCOPE; the skill owns the query pack, algori
      §11 **R5**). **Validity check first:** the id must sit on each *action's* entry span. A
      leaf-/single-op id (e.g. an ad-fetch call) yields only that op's *cadence*, not a journey —
      verify via `session.id`→`trace.id`→entry-op and a funnel-reach join before using it for
-     pacing (board review, ISI-5693 on wkf10640). Grail-native: no RUM / classic-token / PII
-     dependency (Path A = RUM/USQL fusion
+     pacing (board review, ISI-5693 on wkf10640).
+   - **RUM user sessions (`scripts/rum_sessions.py`) — step 2c PREFERRED when RUM is present.**
+     Dynatrace RUM is **Grail/DQL-native** via `fetch user.sessions` (session shape: action /
+     navigation counts, duration, bounce — one row per real-user session) and `fetch user.events`
+     (ordered per-action navigation → exact sequence + think-times + real pages), keyed by
+     `dt.rum.session.id`. **No classic `dt0c01`/USQL token** (this corrects the ISI-5691 NO-GO,
+     which probed `dt.rum.*`/span attrs — the wrong objects). `user.events` needs OAuth scope
+     `storage:user.events:read`; `user.sessions` typically does not. Scrub PII (geo / user / IP)
+     from any RUM field before it reaches the G4 dataset (§7.1). Grail-native: no classic-token
+     dependency (legacy Path A = RUM via USQL
      stays board-gated, ISI-5691 NO-GO on Grail-only RUM). App-agnostic — works for non-browser
      apps too (validated on an A2A agent). Coverage % is recorded on `source.sessionIdCoverage`
      next to the sampling ratio; where `session.id` is absent, tiers 2a/2b are the unchanged

@@ -7,7 +7,27 @@
 > Tenant **wkf10640** via the readonly `tenant-b` dtctl context. Window: 24h ending
 > 2026-10-12T13:16Z. Extraction/investigation only — tenant kept read-only (§7.1).
 
-## Verdict: **mechanism GO; on wkf10640 the signal is NOT usable as a user-session journey.**
+## ⚑ UPDATE 2 (board review round 2, 2026-10-12) — the real signal is Grail RUM `user.sessions`
+
+The board rejected the span/`session.id` framing and pointed at the correct object:
+`fetch user.events | filter dt.rum.session.id == "…"`. Investigating confirmed a **major
+correction that supersedes the ISI-5691 NO-GO**: Dynatrace RUM sessions **are** Grail/DQL-native
+on this tenant — ISI-5691 simply probed the wrong objects (`dt.rum.*`, RUM attrs on `spans`). The
+real objects are **`user.sessions`** and **`user.events`**, keyed by **`dt.rum.session.id`**. No
+classic `dt0c01`/USQL token is needed (that was the Path-A assumption). Details in **§7**. The
+span/`session.id` sections below (ad-fetch marker) remain true but are now **secondary** — the
+RUM user-session objects are the primary, correct signal.
+
+- `fetch user.sessions` — **accessible today** on the `tenant-b` read token. **35,679 sessions /
+  24h** across 5 RUM apps incl. mobile; per-session action/navigation counts, duration, bounce,
+  errors, app, geo/device. This is the real user-session population (Astroshop 17.1k · EasyTrade
+  7.9k · Astroshop-PureOTel 5.2k · Astroshop_Android 2.9k · others).
+- `fetch user.events` — **scope-gated** (`403`, needs OAuth scope `storage:user.events:read`).
+  Holds the per-session **ordered** navigation (views / user actions / requests) → the exact
+  action sequence, per-action think-times, and the actual pages/use-cases. **This is the one
+  thing blocking full ordered-journey Path B.**
+
+## Verdict (span/session.id track): **mechanism GO; the `session.id` span attribute is NOT a usable user-session journey.**
 
 The session-stitch **mechanism** works and is shipped (pure module, app-agnostic, tested). But
 a board review (2026-10-12, §6 below) correctly flagged that the `session.id` on this tenant is
@@ -151,6 +171,52 @@ signal. Path B cannot recover multi-use-case journeys here. Fix is app-side (pro
 `session.id` baggage onto every action's entry span). The extractor change is corrected to
 record coverage **without** using the cadence as think-time (model rev 3).
 
+## 7. Grail-native RUM user sessions (`user.sessions` / `user.events`) — the correct signal
+
+**This supersedes the ISI-5691 step-2c NO-GO.** ISI-5691 concluded RUM was unreachable in Grail,
+but it probed `dt.rum.*` data objects and RUM attributes on `spans` — neither is how Dynatrace
+exposes RUM in Grail. The real objects are `user.sessions` and `user.events`, keyed by
+`dt.rum.session.id`, and they are DQL-native (no classic `dt0c01`/USQL token — the Path-A premise
+was wrong for this platform version).
+
+### 7.1 `user.sessions` — accessible now, the real user-session population
+
+`fetch user.sessions` returns one row per real-user session with 54 fields incl.
+`dt.rum.session.id`, `dt.rum.application.entities` / `frontend.name`, `duration`,
+`user_action_count`, `navigation_count`, `user_interaction_count`, `request_count`,
+`view_summary_count`, `characteristics.is_bounce`, `end_reason`, `error.*`, geo/device/browser.
+
+**Live coverage (24h, read-only):** **35,679 sessions** across 5 RUM apps:
+
+| app | type | sessions | actions/session (p50) | duration p50 | bounce |
+|---|---|---:|---:|---:|---:|
+| Astroshop | web | 17,114 | 8 | 15 s | 0.06 % |
+| EasyTrade_1 | web | 7,865 | 9 | 26 s | 0 % |
+| Astroshop_Pure_OpenTelemetry | web | 5,197 | 6 | 75 s | 1.4 % |
+| Astroshop_Android | mobile | 2,905 | 1 | 89 s | 0 % |
+| (My_web_application, APPLICATION-CB02…, …) | web | ~2,000 | varies | varies | — |
+
+This alone delivers the **session boundary + session length (R5)** signal for the whole RUM
+population — exactly "more use cases using the user session", and **app-agnostic** (web *and*
+mobile). `scripts/rum_sessions.py` consumes these rows → per-app `session_shape()`
+(actions / navigations / duration distributions, bounce, error-session rate) + `rum_coverage()`.
+A first-order pacing estimate `mean_interaction_gap = duration/(actions-1)` is provided but
+**labelled approximate** — `user.sessions` has no per-action timings.
+
+### 7.2 `user.events` — scope-gated, needed for ordered journeys + exact think-times
+
+`fetch user.events | filter dt.rum.session.id == "…"` (the board's example) returns the ordered
+navigation within a session: views, user actions, requests, errors — i.e. the actual pages/use
+cases, their order, and exact inter-action timings. On the `tenant-b` read token it returns
+**`403 NOT_AUTHORIZED_FOR_TABLE` — missing `storage:user.events:read`**. This is the **only**
+blocker to a true ordered-journey Path B (real sequence + measured per-action think-times + the
+real browse/cart/checkout use cases per session).
+
+**Unblock:** tenant admin / board adds `storage:user.events:read` (and it already grants
+`user.sessions`) to the `tenant-b` read token. Then the extractor stitches real ordered journeys
+from `user.events` grouped by `dt.rum.session.id` — the full R5 closure, Grail-native, no classic
+token, no PII beyond opaque session ids (§7.1 PII scrub still applies to geo/user fields).
+
 ## Deliverables (shipped)
 
 - `skills/workload-model/scripts/session_stitch.py` — pure Path B module: `stitch()`,
@@ -165,6 +231,11 @@ record coverage **without** using the cadence as think-time (model rev 3).
   samples (deterministic replay without tenant access).
 - `skills/workload-model/tests/test_session_stitch.py` — 12 tests (ordering, think-time clip,
   coverage %, empirical/exponential spec, single-action→None, max-gap split, fixture repro).
+- **`skills/workload-model/scripts/rum_sessions.py`** — Grail-native RUM module (§7): consumes
+  `user.sessions` → `session_shape()` + `rum_coverage()` + approximate `mean_interaction_gap_s()`.
+- **`skills/workload-model/fixtures/wkf10640_rum_sessions.json`** — live per-app `user.sessions`
+  facts (35,679 sessions / 5 apps). **`tests/test_rum_sessions.py`** — 6 tests.
+- Additive `source.rumSessionCoverage` in `schema.json`.
 
 ## Methodology note for BigBoss (fold into §3.1 step 2c)
 
@@ -194,5 +265,8 @@ only route to true browser user-session journeys and stays board-gated (ISI-5691
 | **§6** session→trace→entry op | `... service.name=="ad" and isNotNull(session.id) \| fields session.id, trace.id \| join [ ... request.is_root_span==true \| fields trace.id, service.name, span.name ], on:{trace.id} \| summarize by:{entryOp}` → frontend-proxy ingress / frontend /api/data / ad GetAds |
 | **§6** ad-session ⟂ funnel | `... service.name=="ad" and isNotNull(session.id) \| fields trace.id \| join [ ... in(service.name,{"cart","checkout","payment","product-catalog",...}) \| fields trace.id, service.name ], on:{trace.id} \| summarize by:{svc}` → **0 rows** |
 | **§6** frontend untagged | `fetch spans \| filter service.name=="frontend" \| summarize total=count(), withSession=countIf(isNotNull(session.id))` → 1,406,793 / **0** |
+| **§7** RUM session shape | `fetch user.sessions \| fieldsAdd app=dt.rum.application.entities[0], fe=frontend.name[0] \| summarize sessions=count(), avg(user_action_count), percentile(duration,50), avg(toLong(characteristics.is_bounce)), by:{fe, dt.rum.application.type}` → 35,679 sessions / 5 apps |
+| **§7** RUM total | `fetch user.sessions \| summarize count(), countDistinctExact(dt.rum.session.id)` → 35,679 / 35,679 |
+| **§7** user.events (gated) | `fetch user.events \| filter dt.rum.session.id=="…"` → **403 missing `storage:user.events:read`** |
 
 Token `tenant-b-read` still un-rotated (flagged to board since ISI-5684) — valid for this round.
