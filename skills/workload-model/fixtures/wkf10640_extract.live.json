@@ -1,0 +1,514 @@
+{
+  "_comment": "LIVE extraction (ISI-5723 rev2): volumetrics re-queried live via dtctl context 'tenant-b' (wkf10640) over a 3h window; journey STRUCTURE (step trees, codeRefs, route identities, buyer funnel) reused from the captured structural base (stable across the same otel-demo image). Nothing depends on user.events.",
+  "environment": "wkf10640",
+  "timeframe": "-3h (LIVE, demo run)",
+  "window_seconds": 10800,
+  "access_log_availability": "unavailable",
+  "access_log_probe": "fetch logs | filter k8s.container.name == 'istio-proxy' -> 0 lines. No mesh access logs shipped; HTTP surface recovered from frontend server-span span.name routes (spans-only).",
+  "sampling_ratio": 1.0,
+  "front_end": {
+    "resolved": "frontend",
+    "resolved_op": "GET",
+    "method": "earliest-start root span per trace + noise classifier. Root spans on this tenant are OneAgent/OTel server spans on 'frontend' (no load-generator user_* driver layer), so the HTTP surface is recovered from frontend server-span span.name routes.",
+    "ingress_crosscheck": "N/A - no istio-ingressgateway access logs on tenant; edge 'frontend-proxy' (ingress) present as the mesh-edge equivalent and reach-confirmed (69,451 ingress root spans)."
+  },
+  "journeys": [
+    {
+      "op": "buyer_checkout_flow",
+      "traces": 2900,
+      "svc_set": [
+        "frontend",
+        "frontend-proxy",
+        "cart",
+        "currency",
+        "shipping",
+        "quote",
+        "payment",
+        "checkout",
+        "email",
+        "product-catalog",
+        "flagd"
+      ]
+    },
+    {
+      "op": "browser_browse_flow",
+      "traces": 319039,
+      "svc_set": [
+        "frontend",
+        "frontend-proxy",
+        "product-catalog",
+        "cart",
+        "recommendation",
+        "ad",
+        "currency",
+        "flagd"
+      ]
+    }
+  ],
+  "per_minute_cov": {
+    "meanRpm": 1808.98,
+    "sd": 533.11,
+    "cov": 0.2947,
+    "minRpm": 120,
+    "maxRpm": 2604,
+    "bins": 181
+  },
+  "per_minute_counts": [
+    1235,
+    1691,
+    2036,
+    1905,
+    1757,
+    1950,
+    1828,
+    2032,
+    1704,
+    1969,
+    1852,
+    1974,
+    2043,
+    1841,
+    1848,
+    2064,
+    1998,
+    2000,
+    1520,
+    1605,
+    1570,
+    1390,
+    1672,
+    1527,
+    1630,
+    1475,
+    1556,
+    1601,
+    1493,
+    1549,
+    1787,
+    1617,
+    1603,
+    1439,
+    1505,
+    1498,
+    1527,
+    1706,
+    1482,
+    1463,
+    1527,
+    1611,
+    1590,
+    1528,
+    1746,
+    1550,
+    1691,
+    1788,
+    2291,
+    2147,
+    2117,
+    1909,
+    2394,
+    2137,
+    2116,
+    2115,
+    2293,
+    2385,
+    2155,
+    2051,
+    2326,
+    2125,
+    2219,
+    2284,
+    2221,
+    2031,
+    2030,
+    2090,
+    2317,
+    2166,
+    2185,
+    2111,
+    2167,
+    2202,
+    2351,
+    2318,
+    2388,
+    2340,
+    1996,
+    2083,
+    1868,
+    1976,
+    2000,
+    1904,
+    1810,
+    1911,
+    1837,
+    1903,
+    2006,
+    1940,
+    2122,
+    2048,
+    1706,
+    1872,
+    1784,
+    1710,
+    2062,
+    1865,
+    1754,
+    1810,
+    1791,
+    1871,
+    2002,
+    1774,
+    1936,
+    2043,
+    1998,
+    1936,
+    1783,
+    1767,
+    1924,
+    1892,
+    1948,
+    1965,
+    1698,
+    1767,
+    2091,
+    1898,
+    1943,
+    2017,
+    1941,
+    2045,
+    1838,
+    1959,
+    1848,
+    1885,
+    1868,
+    1832,
+    2019,
+    1888,
+    1722,
+    1798,
+    1843,
+    1880,
+    1883,
+    1960,
+    1881,
+    2091,
+    2053,
+    1709,
+    1994,
+    1901,
+    1951,
+    1818,
+    1904,
+    1791,
+    1968,
+    2034,
+    1828,
+    2161,
+    2092,
+    2166,
+    1919,
+    1870,
+    1872,
+    2151,
+    1764,
+    2040,
+    1939,
+    1725,
+    1988,
+    1916,
+    1977,
+    1957,
+    1858,
+    1900,
+    2109,
+    2102,
+    2091,
+    1732,
+    1990,
+    1934,
+    2068,
+    1827,
+    1874,
+    1950,
+    1869,
+    1772,
+    1942,
+    1040,
+    0
+  ],
+  "server_baseline_frontend": {
+    "p50_ms": 9.444,
+    "p90_ms": 147.177,
+    "p95_ms": 294.093,
+    "p99_ms": 6648.885,
+    "mean_ms": 246.325,
+    "count": 840805,
+    "errs": 4
+  },
+  "server_rate_tps": 77.85,
+  "observed_concurrency": 19.177,
+  "route_baselines": {
+    "GET /": {
+      "p50": 5,
+      "p95": 12,
+      "p99": 23,
+      "cnt": 5694
+    },
+    "GET /api/products?currencyCode=USD": {
+      "p50": 3,
+      "p95": 42,
+      "p99": 108,
+      "cnt": 9968
+    },
+    "POST /api/cart?currencyCode=USD": {
+      "p50": 4,
+      "p95": 30,
+      "p99": 108,
+      "cnt": 9218
+    },
+    "GET /api/cart": {
+      "p50": 8,
+      "p95": 31,
+      "p99": 73,
+      "cnt": 2941
+    },
+    "POST /api/checkout?currencyCode=USD": {
+      "p50": 7,
+      "p95": 236,
+      "p99": 364,
+      "cnt": 2946
+    },
+    "GET /api/data?contextKeys=telescopes": {
+      "p50": 2,
+      "p95": 42,
+      "p99": 167,
+      "cnt": 4734
+    },
+    "GET /api/recommendations": {
+      "p50": 40,
+      "p95": 84,
+      "p99": 148,
+      "cnt": 4367
+    },
+    "GET /api/currency": {
+      "p50": 4,
+      "p95": 44,
+      "p99": 104,
+      "cnt": 4394
+    }
+  },
+  "product_keys": {
+    "distinct": 10,
+    "reads": 24932,
+    "access_counts": {
+      "L9ECAV7KIM": 2551,
+      "OLJCESPC7Z": 2543,
+      "LS4PSXUNUM": 2528,
+      "0PUK6V6EV0": 2499,
+      "6E92ZMYYFZ": 2492,
+      "2ZYFJ3GM2N": 2475,
+      "9SIQT8TOJO": 2472,
+      "66VCHSJNUP": 2471,
+      "1YMWWN1N4O": 2453,
+      "HQTGWGPNH4": 2448
+    }
+  },
+  "_journey_note": "Root spans on wkf10640 are frontend server HTTP routes (no locust user_* driver). The two behavioral archetypes partition traffic by business outcome (does the flow reach an order-terminal service: checkout/payment?). Buyer = 2,810 traces reach checkout/payment; Browser = 303,223 do not. order-terminal detection is structural via ORDER_TERMINAL_PATTERNS.",
+  "order_split": {
+    "buyer_traces": 2900,
+    "browser_traces": 319039,
+    "buyer_share": 0.009,
+    "browser_share": 0.991,
+    "signal": "trace reaches an order-terminal service (checkout/payment); detected structurally via ORDER_TERMINAL_PATTERNS; total frontend root traces = 321939"
+  },
+  "buyer_funnel_reconstructed": "checkout trace (reconstructed): frontend POST /api/checkout -> checkout PlaceOrder -> CartService/GetCart -> ProductCatalog/GetProduct xN -> Currency/Convert xN -> shipping get-quote -> quote getquote -> payment Charge -> shipping ship-order -> CartService/EmptyCart -> email. checkout p99 = 364 ms (healthy on this tenant, vs the 150 s pathological tail on oat05854).",
+  "buyer_steps": [
+    {
+      "id": "s1",
+      "service": "frontend",
+      "operation": "GET /api/products?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 42,
+        "p99Ms": 108,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s2",
+      "service": "frontend",
+      "operation": "POST /api/cart?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/cart.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "dependsOn": [
+        "s1"
+      ],
+      "baseline": {
+        "p50Ms": 4,
+        "p95Ms": 30,
+        "p99Ms": 108,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s1",
+          "extract": {
+            "from": "body_json",
+            "path": "$.[0].id"
+          },
+          "inject": {
+            "into": "body_field",
+            "as": "productId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "service": "frontend",
+      "operation": "GET /api/cart",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/cart.ts#handler",
+      "evidenceSource": "span",
+      "dependsOn": [
+        "s2"
+      ],
+      "baseline": {
+        "p50Ms": 8,
+        "p95Ms": 31,
+        "p99Ms": 73,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s2",
+          "extract": {
+            "from": "header",
+            "path": "set-cookie:session"
+          },
+          "inject": {
+            "into": "header",
+            "as": "cookie"
+          }
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "service": "frontend",
+      "operation": "POST /api/checkout?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/checkout.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "checkout",
+      "dependsOn": [
+        "s2"
+      ],
+      "baseline": {
+        "p50Ms": 7,
+        "p95Ms": 236,
+        "p99Ms": 364,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s2",
+          "extract": {
+            "from": "header",
+            "path": "set-cookie:session"
+          },
+          "inject": {
+            "into": "header",
+            "as": "cookie"
+          }
+        }
+      ]
+    }
+  ],
+  "browser_steps": [
+    {
+      "id": "s1",
+      "service": "frontend",
+      "operation": "GET /",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/index.tsx#Home",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 5,
+        "p95Ms": 12,
+        "p99Ms": 23,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s2",
+      "service": "frontend",
+      "operation": "GET /api/products?currencyCode=USD",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/products/index.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 42,
+        "p99Ms": 108,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s3",
+      "service": "frontend",
+      "operation": "GET /api/data?contextKeys=telescopes",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/data/index.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 2,
+        "p95Ms": 42,
+        "p99Ms": 167,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s4",
+      "service": "frontend",
+      "operation": "GET /api/recommendations",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/recommendations/index.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 40,
+        "p95Ms": 84,
+        "p99Ms": 148,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s5",
+      "service": "frontend",
+      "operation": "GET /api/currency",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/currency/index.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 4,
+        "p95Ms": 44,
+        "p99Ms": 104,
+        "errorRate": 0.0
+      }
+    }
+  ],
+  "live_extraction": {
+    "ran_at_window": "3h",
+    "total_root_traces": 321939,
+    "user_sessions_count": 3628,
+    "user_events_available": false,
+    "user_events_degrade_note": "fetch user.events -> 403 NOT_AUTHORIZED_FOR_TABLE (missing storage:user.events:read, ISI-5719). Degraded to spans + user.sessions. Model journeys are span-order reconstructed, so the degrade is lossless for this demo."
+  }
+}

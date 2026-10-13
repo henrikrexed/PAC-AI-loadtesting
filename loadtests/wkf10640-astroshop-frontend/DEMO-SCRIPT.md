@@ -3,18 +3,37 @@
 **One observed workload model → two runnable load tests (k6 + JMeter).**
 Theme: *The Matrix* 🔴💊 — *"I know kung fu." / "Show me." / "Guns. Lots of guns."*
 
-- **Duration on stage:** ~4 min. **No live cluster calls** — everything below is pre-baked and deterministic.
-- **Source model:** `loadtests/wkf10640-astroshop-frontend/workload-model.json` — live Astroshop frontend, tenant `wkf10640`, G0 12/12, real RUM→span extrapolation factor **1.27**.
-- **Driver:** `./run-demo.sh` renders both tools from the model and prints the diff. Safe to run live or play the captured `demo-transcript.txt`.
+- **Duration on stage:** ~5 min.
+- **Primary = FULL LIVE (rev2):** `./run-demo-live.sh` — live DQL (`fetch spans` + `fetch user.sessions`)
+  on `tenant-b`/wkf10640 → materialize the Astroshop model → **live V1 human gate** → render k6 + JMeter.
+  **No pre-baked `workload-model.json` as the source.** Step 0 auto-checks tenant reachability.
+- **Fallback = recorded (rev1):** `./run-demo.sh` renders both tools from the committed deterministic
+  model and prints the diff; `demo-transcript.txt` is the captured run. Use only if stage network/tenant
+  is down (`run-demo-live.sh` tells you when to switch).
+- **The glitch in the Matrix:** `fetch user.events` is scope-gated → **403** (`storage:user.events:read`,
+  [ISI-5719](/ISI/issues/ISI-5719)). The live extractor catches it and degrades to spans + `user.sessions`
+  — a real, narratable moment, lossless for this demo (journeys are span-order reconstructed).
 
 ---
 
-## Step 0 — set the scene (10s)
-> "This model was *observed*, not guessed. DQL spans + RUM sessions on a live Astroshop, extracted earlier — we are not re-extracting on stage."
+## Step 0 — set the scene (10s) · live run
+```bash
+./run-demo-live.sh          # the whole pipeline; steps below narrate what scrolls by
+```
+> "This model is *observed*, not guessed — and we're observing it **right now**. DQL against a live Astroshop, on stage."
 
-Show `scenario-proposal.md` header + the Little's Law line: expected 3.6755 ≈ observed 3.6776 → **ratio 0.9994**. The model is physically consistent with the system it came from.
+## Step 1 — telemetry → model, LIVE (60s) · *"I know kung fu."*
+`live_extract.py` runs the frontend DQL pack against `tenant-b`/wkf10640 and materializes
+`workload-model.json` from the result; `build_wkf10640.py` re-runs the **G0 gate (12/12)** on the
+fresh numbers. Call out as they print:
+- live **total frontend root traces** and order split **browser ~99% / buyer ~1%** (re-derived live, not a constant);
+- `samplingRatio: 1.0` (this tenant is unsampled — important for the sampling slide);
+- **the glitch:** `fetch user.events → 403` scrolls by → *"there's the scope wall — we degrade to spans + user.sessions, and the model never needed it."*
 
-## Step 1 — telemetry → model (45s) · *"I know kung fu."*
+Then the **V1 human gate** fires (`approve_model.py`): *"the engine won't synthesize a single request until a human approves what it observed."*
+
+### (fallback only) pre-baked model
+If Step 0 reported the tenant unreachable, run `./run-demo.sh` instead and narrate from the committed model:
 ```bash
 sed -n '1,30p' workload-model.json      # metadata.source.queries — the real DQL
 ```
@@ -45,9 +64,14 @@ sed -n '1,40p' DEMO-DIFF.md
 
 ---
 
-## Artifacts committed under `loadtests/wkf10640-astroshop-frontend/`
+## Artifacts under `loadtests/wkf10640-astroshop-frontend/`
+**Live (rev2, primary):**
+- `run-demo-live.sh` — full live e2e driver (DQL → model → gate → k6+JMeter), auto-detects tenant reachability
+- live extractor + signer live under `skills/workload-model/scripts/` (`live_extract.py`, `approve_model.py`);
+  `build_wkf10640.py` takes a `WKF10640_FIXTURE` override so the deterministic build runs on the live extract unchanged
+- `skills/workload-model/fixtures/wkf10640_extract.live.json` — a sample captured live run (shows shape + the 403 degrade)
+
+**Recorded fallback (rev1):**
 - `workload-model.json` (rev 3, V1-approved) · `scenario-proposal.md` · `merge-plan.json`
-- `k6/` (script + `lib/` + `payloads/`) — V2a PASS
-- `jmeter/` (`.jmx` + `data/*.csv` + manifest) — J1–J7 PASS
-- `DEMO-DIFF.md` — the model→two-tools comparison table
-- `run-demo.sh` · `demo-transcript.txt` — reproducible driver + captured run
+- `k6/` (script + `lib/` + `payloads/`) — V2a PASS · `jmeter/` (`.jmx` + `data/*.csv` + manifest) — J1–J7 PASS
+- `DEMO-DIFF.md` — the model→two-tools comparison table · `run-demo.sh` · `demo-transcript.txt`

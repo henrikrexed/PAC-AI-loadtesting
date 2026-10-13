@@ -13,6 +13,7 @@ Run:  python3 build_wkf10640.py   (exit 0 iff G0 passes)
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import clustering as cl
@@ -24,10 +25,13 @@ from g0_gate import evaluate_g0
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent.parent.parent
-FIXTURE = HERE.parent / "fixtures" / "wkf10640_extract.json"
+# FIXTURE can be overridden to a live-extracted file (see live_extract.py / ISI-5723 rev2
+# full-live demo) without changing the deterministic build at all: same schema in, same
+# G0-gated model out. Defaults to the captured 2026-10-12 extract.
+FIXTURE = Path(os.environ.get("WKF10640_FIXTURE", HERE.parent / "fixtures" / "wkf10640_extract.json"))
 SESSION_FIXTURE = HERE.parent / "fixtures" / "wkf10640_session_stitch.json"
 OUT_DIR = ROOT / "loadtests" / "wkf10640-astroshop-frontend"
-GENERATED_AT = "2026-10-12T00:00:00Z"
+GENERATED_AT = os.environ.get("WKF10640_GENERATED_AT", "2026-10-12T00:00:00Z")
 
 QUERIES = [
     "fetch spans | filter request.is_root_span==true | sort start_time asc | summarize takeFirst(service.name),takeFirst(span.name) by trace.id | summarize count() by entryService,entryOp  (G1-C front-end discovery -> frontend dominant)",

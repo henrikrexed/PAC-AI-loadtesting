@@ -75,3 +75,47 @@ Verdict key: ✅ accurate as stated · ⚠️ accurate only if phrased carefully
 **Bottom line:** the demo and its numbers are defensible. The two slides most likely to draw a
 challenge are **§2 (sampling vs the 1.27 factor)** and **§4 (`session.id` span attr vs `dt.rum.session.id`)** —
 both are easy to state wrong and are corrected above. Everything else is accurate if phrased per the ⚠️ notes.
+
+---
+
+## 8. Architecture recap — slide #13 "the stack in our cluster" (rev2 add) — ✅ with pipeline annotations
+The plan's arch flow is **Astroshop/otel-demo → OTel Collector → Dynatrace Grail (spans + RUM) →
+agent + skill + engine → renderers**. Fact-check against what is actually wired:
+- ✅ **Astroshop = the OpenTelemetry Demo** (`frontend` + ~15 microservices), auto/SDK-instrumented,
+  OTLP → **OTel Collector** → Dynatrace. Correct and standard.
+- ✅ **Grail stores two surfaces we read:** the **`spans`** table (traces) and **RUM** (`user.sessions`,
+  `user.events`), queried with **DQL via `dtctl`** (readonly context `tenant-b` = wkf10640).
+- ⚠️ **Annotate the logs leg honestly.** On wkf10640 the `istio-proxy` access-log probe returns **0 lines**
+  — logs are *not* a populated extraction source here. If the diagram draws a logs arrow into the model,
+  label it "unavailable on this tenant (spans-only)."
+- ⚠️ **Annotate `user.events` as scope-gated.** The RUM→model arrow for `user.events` is **403
+  (`storage:user.events:read`, [ISI-5719](/ISI/issues/ISI-5719))**; live extraction **degrades to spans +
+  `user.sessions`**. Draw it as a dashed/"glitch" edge, not a solid feed.
+- ✅ **Engine = 3 layers** (matches §6): **Extract** (`dtctl` DQL → `workload-model.json`) → **Render**
+  (one approved model → N tools via the Renderer interface) → **Execute+validate** (`loadtest-run`,
+  `synthetic=true` baggage → G5 `validate-traces`). The **V1 human gate** sits between Extract and Render
+  and is enforced in code (renderers refuse an unapproved model) — worth drawing as an explicit gate.
+- ⚠️ **Keep "readonly / extraction-only / non-production / tenant isolated"** on the diagram: the token is
+  readonly and the methodology (§7.1) forbids production targets without board approval.
+- **Repo/asset links on #13 and the close slide:** point to `skills/workload-model` (extract+schema+gates),
+  `skills/{k6,jmeter,locust,gatling}-synthesis` + `skills/renderer-kit` (render), `skills/loadtest-run`
+  (execute), and `loadtests/wkf10640-astroshop-frontend/` (this demo's artifacts). Verify each path resolves
+  in the public mirror before the QR/links go on the slide.
+
+## 9. rev2 demo change — FULL LIVE end-to-end (verified this run) — ✅
+The demo is now **live on stage**, not a pre-baked model (plan rev2). Verified end-to-end against
+live wkf10640 on 2026-10-13 (`run-demo-live.sh`):
+- **live DQL** `fetch spans` + `fetch user.sessions` → `live_extract.py` → fresh `wkf10640_extract.live.json`
+  → `build_wkf10640.py` (**G0 12/12**) → **live V1 human gate** (`approve_model.py`) → **k6 V2a 7/7** +
+  **JMeter J1–J7**. No committed `workload-model.json` as the source.
+- **Live numbers captured this run (3h window):** 321,495 frontend root traces; order split **buyer 0.9% /
+  browser 99.1%** (independently re-confirmed live, matches the methodology); server rate **77.9 tps**;
+  product-key cardinality **10**; `samplingRatio` **1.0**; `user.sessions` reachable.
+- **The "glitch in the Matrix" is real and reproducible on cue:** `fetch user.events` → **403
+  NOT_AUTHORIZED_FOR_TABLE** (missing `storage:user.events:read`). The extractor catches it and degrades to
+  spans + `user.sessions`; nothing in the model depends on `user.events`, so the degrade is **lossless** for
+  this demo. ⚠️ Live volumetrics vary by window (e.g. latency/concurrency were higher in this run than the
+  captured 3h fixture) — narrate numbers as "what the system is doing right now," not fixed constants.
+- **Fallback:** the committed rev1 artifacts + `run-demo.sh` + `demo-transcript.txt` are a rehearsed
+  recorded run of the identical flow, played only if stage network/tenant is down (`run-demo-live.sh`
+  Step 0 auto-detects reachability and tells you to fall back).
