@@ -22,14 +22,18 @@ the frontend journey *structure* does not change minute-to-minute — only its v
   - route surface identities, buyer funnel narration, product key identities
   - access-log availability (mesh ships none here), session-stitch note
 
-The "glitch in the Matrix": `fetch user.events` is scope-gated (403, missing
-`storage:user.events:read`, ISI-5719). We probe it live, catch the 403, and degrade
-gracefully to spans + user.sessions — exactly as narrated on stage. Nothing in the model
-depends on user.events (journeys are span-order reconstructed), so the degrade is lossless
-for this demo and is recorded on the output for auditability.
+`fetch user.events` WAS scope-gated (403, missing `storage:user.events:read`, ISI-5719)
+until the board granted the scope on the wkf10640 token (2026-10-13); the live probe now
+returns rows (prints `user.events: AVAILABLE`). Nothing in *this* model depends on
+user.events either way (frontend journeys are span-order reconstructed from spans +
+user.sessions), so we still probe it with `allow_403=True` and degrade gracefully if the
+scope is ever missing — the availability + any degrade note is recorded on the output for
+auditability. The now-flowing user.events unlocks the ordered-RUM journey upgrade
+(`rum-journey-model.json`, ISI-5719), which is a separate artifact, not this render's input.
 
 Run:  python3 live_extract.py [--context tenant-b] [--window 3h] [--out <path>]
-Exit 0 iff the live span pack succeeded (user.events 403 is expected, not a failure).
+Exit 0 iff the live span pack succeeded (a user.events 403, if the scope is absent, is
+tolerated and degrades — not a failure).
 """
 
 from __future__ import annotations
@@ -167,7 +171,8 @@ def main() -> int:
         sampling_ratio = 1.0
     log(f"sampling_ratio={sampling_ratio}")
 
-    # --- the "glitch in the Matrix": user.events is scope-gated (ISI-5719) ---
+    # --- user.events: scope granted 2026-10-13 (ISI-5719) -> now AVAILABLE; still
+    #     probed with allow_403 so the pack degrades gracefully if the scope is absent ---
     ue = dql(ctx, f'fetch user.events, {fr} | summarize c=count()', allow_403=True)
     user_events_degraded = "error_403" in ue
     log("user.events: 403 scope-gated -> graceful degrade to spans + user.sessions"

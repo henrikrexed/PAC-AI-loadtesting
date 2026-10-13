@@ -10,9 +10,13 @@ Theme: *The Matrix* 🔴💊 — *"I know kung fu." / "Show me." / "Guns. Lots o
 - **Fallback = recorded (rev1):** `./run-demo.sh` renders both tools from the committed deterministic
   model and prints the diff; `demo-transcript.txt` is the captured run. Use only if stage network/tenant
   is down (`run-demo-live.sh` tells you when to switch).
-- **The glitch in the Matrix:** `fetch user.events` is scope-gated → **403** (`storage:user.events:read`,
-  [ISI-5719](/ISI/issues/ISI-5719)). The live extractor catches it and degrades to spans + `user.sessions`
-  — a real, narratable moment, lossless for this demo (journeys are span-order reconstructed).
+- **The wall came down (update 2026-10-13):** `fetch user.events` **was** scope-gated → 403 until the
+  board granted `storage:user.events:read` on the wkf10640 token ([ISI-5719](/ISI/issues/ISI-5719)); it now
+  returns rows. The frontend demo model is built from **spans + `user.sessions`** and does **not** depend on
+  `user.events` either way, so the k6/JMeter render is identical — but the extractor still probes it live and
+  **degrades gracefully** if the scope is ever missing (the live script prints `user.events: AVAILABLE` or the
+  degrade note). The now-flowing `user.events` unlocks the **ordered-RUM journey upgrade** (`rum-journey-model.json`:
+  16 ordered templates + real measured think-times, 18,773 sessions) — a "what's next" beat, not part of this render.
 
 ---
 
@@ -28,7 +32,7 @@ Theme: *The Matrix* 🔴💊 — *"I know kung fu." / "Show me." / "Guns. Lots o
 fresh numbers. Call out as they print:
 - live **total frontend root traces** and order split **browser ~99% / buyer ~1%** (re-derived live, not a constant);
 - `samplingRatio: 1.0` (this tenant is unsampled — important for the sampling slide);
-- **the glitch:** `fetch user.events → 403` scrolls by → *"there's the scope wall — we degrade to spans + user.sessions, and the model never needed it."*
+- **the wall came down:** `fetch user.events` now returns rows (scope granted 2026-10-13) → *"this was a 403 wall last week; the model never needed it — it's built from spans + user.sessions — and now that user.events flows, it unlocks ordered journeys + real think-times (rum-journey-model.json)."* (If the scope is ever missing the extractor degrades gracefully and prints the 403 note — still lossless.)
 
 Then the **V1 human gate** fires (`approve_model.py`): *"the engine won't synthesize a single request until a human approves what it observed."*
 
@@ -69,7 +73,8 @@ sed -n '1,40p' DEMO-DIFF.md
 - `run-demo-live.sh` — full live e2e driver (DQL → model → gate → k6+JMeter), auto-detects tenant reachability
 - live extractor + signer live under `skills/workload-model/scripts/` (`live_extract.py`, `approve_model.py`);
   `build_wkf10640.py` takes a `WKF10640_FIXTURE` override so the deterministic build runs on the live extract unchanged
-- `skills/workload-model/fixtures/wkf10640_extract.live.json` — a sample captured live run (shows shape + the 403 degrade)
+- `skills/workload-model/fixtures/wkf10640_extract.live.json` — a sample captured live run (shows the extract shape; the live probe now reports `user.events: AVAILABLE`, and still degrades gracefully if the scope is absent)
+- `rum-journey-model.json` + `rum-journey-sidebyside.md` — the now-unlocked ordered-RUM upgrade (ISI-5719, `user.events`)
 
 **Recorded fallback (rev1):**
 - `workload-model.json` (rev 3, V1-approved) · `scenario-proposal.md` · `merge-plan.json`

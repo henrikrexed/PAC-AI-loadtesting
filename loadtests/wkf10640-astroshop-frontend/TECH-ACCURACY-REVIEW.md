@@ -37,9 +37,15 @@ Verdict key: ✅ accurate as stated · ⚠️ accurate only if phrased carefully
   **`dt.rum.session.id`**. No classic `dt0c01`/USQL token. ~35.7k sessions/24h, 5 RUM apps incl. mobile.
 - ⚠️ This **overturns the ISI-5691 NO-GO** — if any slide still says "RUM needs a classic token / isn't
   Grail-queryable," that's stale. Correct state is in ISI-5693.
-- ⚠️ `user.events` requires scope **`storage:user.events:read`** (403 without it, ISI-5719). So **ordered
-  per-action journeys + exact measured think-times are NOT in this model.** We used RUM **rate** (the 1.27)
-  only; journey *steps* come from span-order reconstruction. Don't claim full ordered-RUM journeys here.
+- ✅ **UPDATE 2026-10-13:** `user.events` scope **`storage:user.events:read`** has now been **granted** on the
+  wkf10640 token (ISI-5719) — it no longer 403s; 18,773 Astroshop sessions extracted, **16 ordered journey
+  templates + measured think-times** (browse→cart→checkout 83.1%, abandon-at-cart 13.2%; `/` p50 1773ms,
+  `/product` p50 988ms, `/cart` p50 1431ms, `/checkout` p50 831ms). Artifact: `rum-journey-model.json`.
+- ⚠️ **But the rendered k6/JMeter demo still uses the span-order frontend model** (`workload-model.json`):
+  journey *steps* are span-order reconstructed and RUM enters only as **rate** (the 1.27). The ordered-RUM
+  journeys are a **now-available upgrade**, not yet wired into this render. Don't claim the k6/JMeter output
+  is driven by ordered RUM — say "ordered-RUM journeys are now extractable (ISI-5719); folding them into the
+  rendered model is the next step."
 
 ## 4. spans + user.sessions/user.events via DQL; key dt.rum.session.id — ⚠️ (subtle conflation trap)
 - ✅ The DQL objects and the `dt.rum.session.id` key are correct.
@@ -88,9 +94,12 @@ agent + skill + engine → renderers**. Fact-check against what is actually wire
 - ⚠️ **Annotate the logs leg honestly.** On wkf10640 the `istio-proxy` access-log probe returns **0 lines**
   — logs are *not* a populated extraction source here. If the diagram draws a logs arrow into the model,
   label it "unavailable on this tenant (spans-only)."
-- ⚠️ **Annotate `user.events` as scope-gated.** The RUM→model arrow for `user.events` is **403
-  (`storage:user.events:read`, [ISI-5719](/ISI/issues/ISI-5719))**; live extraction **degrades to spans +
-  `user.sessions`**. Draw it as a dashed/"glitch" edge, not a solid feed.
+- ✅ **`user.events` is now a live feed (update 2026-10-13).** The scope `storage:user.events:read` was
+  **granted** on the wkf10640 token ([ISI-5719](/ISI/issues/ISI-5719)); the RUM→model `user.events` arrow is
+  now a **solid feed**, not a 403 "glitch" edge. The frontend demo model still reads spans + `user.sessions`
+  (doesn't depend on `user.events`), and the extractor keeps the graceful 403-degrade for tenants without the
+  scope. If the slide drew a dashed/glitch edge for `user.events`, **make it solid** and add the ordered-RUM
+  upgrade (`rum-journey-model.json`) as a downstream node.
 - ✅ **Engine = 3 layers** (matches §6): **Extract** (`dtctl` DQL → `workload-model.json`) → **Render**
   (one approved model → N tools via the Renderer interface) → **Execute+validate** (`loadtest-run`,
   `synthetic=true` baggage → G5 `validate-traces`). The **V1 human gate** sits between Extract and Render
@@ -111,11 +120,14 @@ live wkf10640 on 2026-10-13 (`run-demo-live.sh`):
 - **Live numbers captured this run (3h window):** 321,495 frontend root traces; order split **buyer 0.9% /
   browser 99.1%** (independently re-confirmed live, matches the methodology); server rate **77.9 tps**;
   product-key cardinality **10**; `samplingRatio` **1.0**; `user.sessions` reachable.
-- **The "glitch in the Matrix" is real and reproducible on cue:** `fetch user.events` → **403
-  NOT_AUTHORIZED_FOR_TABLE** (missing `storage:user.events:read`). The extractor catches it and degrades to
-  spans + `user.sessions`; nothing in the model depends on `user.events`, so the degrade is **lossless** for
-  this demo. ⚠️ Live volumetrics vary by window (e.g. latency/concurrency were higher in this run than the
-  captured 3h fixture) — narrate numbers as "what the system is doing right now," not fixed constants.
+- ⚠️ **STALE as of 2026-10-13 — do NOT narrate a `user.events` 403 on stage.** That verification run predates
+  the scope grant; `storage:user.events:read` has since been **granted** on the wkf10640 token (ISI-5719), so
+  `fetch user.events` now **returns rows**, not a 403. Re-narrate as "the wall came down": the model never
+  depended on `user.events` (spans + `user.sessions`), and now that it flows it unlocks ordered-RUM journeys +
+  measured think-times (`rum-journey-model.json`). The extractor still degrades gracefully (`allow_403`) on any
+  tenant lacking the scope, so the fallback path is intact — it is just no longer the *expected* wkf10640 result.
+- ⚠️ Live volumetrics vary by window (e.g. latency/concurrency were higher in this run than the captured 3h
+  fixture) — narrate numbers as "what the system is doing right now," not fixed constants.
 - **Fallback:** the committed rev1 artifacts + `run-demo.sh` + `demo-transcript.txt` are a rehearsed
   recorded run of the identical flow, played only if stage network/tenant is down (`run-demo-live.sh`
   Step 0 auto-detects reachability and tells you to fall back).

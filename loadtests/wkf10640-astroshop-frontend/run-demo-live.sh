@@ -10,9 +10,11 @@
 #   ./run-demo-live.sh --window 90m    # tighter window
 #   DT_CONTEXT=tenant-b ./run-demo-live.sh
 #
-# The "glitch in the Matrix": fetch user.events is scope-gated (403, ISI-5719). The
-# extractor probes it live, catches the 403, and degrades to spans + user.sessions. The
-# model never depends on user.events, so the degrade is lossless for this demo.
+# user.events: WAS scope-gated (403) until the board granted storage:user.events:read on the
+# wkf10640 token (2026-10-13, ISI-5719); it now returns rows. The model is built from spans +
+# user.sessions and does NOT depend on user.events either way, so the render is identical — the
+# extractor probes it live and degrades gracefully (prints AVAILABLE, or the 403 note if the
+# scope is ever missing). The now-flowing user.events unlocks ordered-RUM journeys (rum-journey-model.json).
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -35,7 +37,7 @@ dtctl query --context "$CTX" -o json \
     echo "!! tenant unreachable — fall back to the RECORDED run: ./run-demo.sh"; exit 3; }
 
 sep "STEP 1 — telemetry -> model (LIVE DQL extraction, window=$WINDOW)"
-echo "running the frontend DQL pack live against $CTX (spans + user.sessions; user.events probed → expect 403 glitch)"
+echo "running the frontend DQL pack live against $CTX (spans + user.sessions; user.events probed → now AVAILABLE, scope granted 2026-10-13; degrades gracefully if ever missing)"
 python3 "$SCRIPTS/live_extract.py" --context "$CTX" --window "$WINDOW" --out "$LIVE_FIXTURE"
 
 sep "STEP 1b — build the Astroshop model from the LIVE extract (G0-gated)"
