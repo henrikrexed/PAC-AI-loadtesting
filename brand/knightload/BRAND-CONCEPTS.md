@@ -107,3 +107,37 @@ SVG twins `svg/knightload-signal-*.svg` (gradients + beam, Ramp-K housed).
 
 > Regeneration: `python3 kl_signal_render.py` (PNGs) · `python3 kl_signal_svg.py` (SVGs).
 > Both on `kl_signal.py` (containers) + `kl_k.py` (approved Ramp-K glyph).
+
+---
+
+## FINAL — Signal Diamond (board pick, round 3.2c accepted)
+
+**Board pick:** Henrik accepted **Direction 2 — Signal Diamond** (interaction r3.2c → `dir-2-diamond`).
+
+The mark: a **night lozenge with a glowing edge** housing the **Ramp-K** whose ascending
+ramp-up is a **glowing graph-bar chart** (the throughput ramp = the load-signal that lights
+up at night). Knight · Night · Load in one glyph; defensibly original (no bat silhouette).
+
+**Final suite** (`brand/knightload/final/`, transparent PNG + SVG):
+
+- **Icon** — `knightload-icon.png/.svg` (+ `-amber`, `-mono-dark`, `-mono-light`).
+- **Horizontal lockup** — `knightload-lockup-horizontal.png/.svg` (+ `-onindigo`, `-onlight`).
+- **Stacked lockup** — `knightload-lockup-stacked.png`.
+- **Sub-brand** — `knightload-engine-lockup.png/.svg`, `knightload-skills-lockup.png/.svg`.
+- **Favicon** — `knightload-favicon-{16,32,48,64,180,256,512}.png` (full 5-bar) plus
+  `knightload-favicon-{16,32}-simple.png` + `-48-mono.png` (**simplified 3-bar** for crisp
+  small sizes, as promised).
+- **Social / OG card** — `knightload-og-card.png` (1200×630).
+- **Review sheet** — `images/knightload-final-suite.png`.
+
+SVG lockups set the wordmark in real `<text>` with the production font stack
+(`'Space Grotesk','Sora',…`); icons are production-true vector.
+
+**Two publish-time items (flagged, not blockers):**
+1. **Font swap** — rasterised PNG wordmarks use **DejaVu Sans Bold** as a stand-in; install
+   **Space Grotesk / Sora** and re-run `kl_final.py` for production PNGs (SVG lockups already
+   reference the real font stack).
+2. **16px favicon** — ship the **3-bar simplified** variant at 16/32px (the full 5-bar merges
+   to a glow block below ~24px).
+
+> Regeneration: `python3 kl_final.py` (PNG suite) · `python3 kl_final_svg.py` (SVG suite).

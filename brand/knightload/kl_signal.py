@@ -208,14 +208,15 @@ def sig_circle(size, accent=CYAN, mono=False):
 
 
 # =========================================================== 2 · signal-diamond
-def sig_diamond(size, accent=CYAN, mono=False):
+def sig_diamond(size, accent=CYAN, mono=False, mono_col=None):
     img, d, W = _tile(size)
     cx, cy = W * 0.5, W * 0.5
     hw, hh = W * 0.40, W * 0.46
     dia = _diamond(cx, cy, hw, hh)
     if mono:
-        d.line(dia + [dia[0]], fill=SILVER + (255,), width=int(W * 0.04), joint="curve")
-        _draw_rampK(img, W, KFRAC * 0.92, SILVER, SILVER)
+        col = mono_col or SILVER  # SILVER on dark; INDIGO0 for reversed-on-light
+        d.line(dia + [dia[0]], fill=col + (255,), width=int(W * 0.04), joint="curve")
+        _draw_rampK(img, W, KFRAC * 0.92, col, col)
         return _finish(img, size)
     # night-gradient diamond with a glowing accent edge (the signal frame)
     mask = Image.new("L", (W, W), 0)
