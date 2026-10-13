@@ -22,7 +22,7 @@ no DC-trademark proximity. Dark night palette, ONE accent glow (teal default /
 amber alt). Pure Pillow + DejaVu (no cairo/resvg) — same stack as ISI-5724.
 """
 import math
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFilter
 import kl_brand as k
 import kl_k
 
@@ -124,29 +124,60 @@ def _anchor(ox, oy, ksz, local):
     return (ox + local[0] * ksz, oy + local[1] * ksz)
 
 
+# ---- enhanced two-tone Ramp-K: stem+leg = structure, upper arm = ascending ----
+# ---- ramp (the "signal"). Ramp thickens toward the top-right so it reads as a
+# ---- throughput ramp-up (the feature Henrik called out).
+RK_STEM = (0.17, 0.13, 0.30, 0.87)
+RK_LEG = [(0.30, 0.52), (0.70, 0.87), (0.84, 0.87), (0.44, 0.50)]
+RK_RAMP = [(0.345, 0.545), (0.82, 0.115), (0.885, 0.205), (0.405, 0.575)]
+RK_JUNCTION = (0.375, 0.56)
+RK_TIP = (0.85, 0.16)
+
+
+def _pl(frac, lx, ly, W):
+    tile = frac * W
+    o = (W - tile) / 2
+    return (o + lx * tile, o + ly * tile)
+
+
+def _draw_rampK(img, W, frac, base, ramp, draw_ramp=True, glow_col=None):
+    """Draw the two-tone Ramp-K. stem+leg in `base`, ascending ramp in `ramp`
+    (optionally with a soft glow). Returns (junction_px, tip_px)."""
+    d = ImageDraw.Draw(img)
+    x0, y0 = _pl(frac, RK_STEM[0], RK_STEM[1], W)
+    x1, y1 = _pl(frac, RK_STEM[2], RK_STEM[3], W)
+    d.rounded_rectangle([x0, y0, x1, y1], radius=0.03 * frac * W, fill=base + (255,))
+    d.polygon([_pl(frac, p[0], p[1], W) for p in RK_LEG], fill=base + (255,))
+    ramp_px = [_pl(frac, p[0], p[1], W) for p in RK_RAMP]
+    if draw_ramp:
+        if glow_col is not None:
+            gl = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+            ImageDraw.Draw(gl).polygon(ramp_px, fill=glow_col + (150,))
+            gl = gl.filter(ImageFilter.GaussianBlur(radius=int(W * 0.018)))
+            img.alpha_composite(gl)
+            d = ImageDraw.Draw(img)
+        d.polygon(ramp_px, fill=ramp + (255,))
+    return _pl(frac, *RK_JUNCTION, W), _pl(frac, *RK_TIP, W)
+
+
 # ============================================================ 1 · signal-circle
+# Night roundel. Structure (stem+leg) in silver; the ascending RAMP is the glowing
+# accent signal — K1's ramp-up top is the hero element.
 def sig_circle(size, accent=CYAN, mono=False):
     img, d, W = _tile(size)
     cx = cy = W * 0.5
     R = W * 0.40
     if mono:
         d.ellipse([cx - R, cy - R, cx + R, cy + R], outline=SILVER + (255,), width=int(W * 0.045))
-        stamp, _ = _kstamp(W, KFRAC, SILVER)
-        img.alpha_composite(stamp)
+        _draw_rampK(img, W, KFRAC, SILVER, SILVER)
         return _finish(img, size)
-    # slim signal shaft rising behind (projected into the night, not wings)
-    img.alpha_composite(_beam(W, cx, cy - R * 0.1, W * 0.04, R * 0.16, R * 0.42, accent, 120, 0))
-    # night roundel
+    img.alpha_composite(_beam(W, cx, cy - R * 0.1, W * 0.04, R * 0.16, R * 0.42, accent, 110, 0))
     mask = Image.new("L", (W, W), 0)
     ImageDraw.Draw(mask).ellipse([cx - R, cy - R, cx + R, cy + R], fill=255)
     night = _vgrad(W, NIGHT_TOP, NIGHT_BOT); night.putalpha(mask)
     img.alpha_composite(night)
-    # rim ring (accent)
     d.ellipse([cx - R, cy - R, cx + R, cy + R], outline=accent + (255,), width=int(W * 0.022))
-    # glow behind K + glowing accent Ramp-K
-    img.alpha_composite(_radial(W, cx, cy, R * 0.82, accent, 110))
-    stamp, _ = _kstamp(W, KFRAC, accent)
-    img.alpha_composite(stamp)
+    _draw_rampK(img, W, KFRAC, SILVER, accent, glow_col=accent)
     return _finish(img, size)
 
 
@@ -158,23 +189,21 @@ def sig_diamond(size, accent=CYAN, mono=False):
     dia = _diamond(cx, cy, hw, hh)
     if mono:
         d.line(dia + [dia[0]], fill=SILVER + (255,), width=int(W * 0.04), joint="curve")
-        stamp, _ = _kstamp(W, KFRAC * 0.92, SILVER)
-        img.alpha_composite(stamp)
+        _draw_rampK(img, W, KFRAC * 0.92, SILVER, SILVER)
         return _finish(img, size)
-    # glowing diamond: accent radial field inside the diamond
+    # night-gradient diamond with a glowing accent edge (the signal frame)
     mask = Image.new("L", (W, W), 0)
     ImageDraw.Draw(mask).polygon(dia, fill=255)
-    field = _radial(W, cx, cy * 0.92, hh * 1.15, accent, 255, power=1.1)
-    base = Image.new("RGBA", (W, W), INDIGO1 + (255,))
-    glow = Image.alpha_composite(base, field)
-    glow.putalpha(mask)
-    img.alpha_composite(glow)
-    # crisp accent edge
+    night = _vgrad(W, NIGHT_TOP, NIGHT_BOT); night.putalpha(mask)
+    img.alpha_composite(night)
+    # soft inner edge glow + crisp accent edge
+    edge = Image.new("RGBA", (W, W), (0, 0, 0, 0))
+    ImageDraw.Draw(edge).line(dia + [dia[0]], fill=accent + (255,), width=int(W * 0.05), joint="curve")
+    edge = Image.composite(edge, Image.new("RGBA", (W, W), (0, 0, 0, 0)), mask)
+    img.alpha_composite(edge.filter(ImageFilter.GaussianBlur(radius=int(W * 0.012))))
     d.line(dia + [dia[0]], fill=accent + (255,), width=int(W * 0.018), joint="curve")
-    # Ramp-K knocked out in night colour (negative space)
-    stamp, _ = _kstamp(W, KFRAC * 0.92, (255, 255, 255))
-    night_k = Image.new("RGBA", (W, W), INDIGO0 + (255,))
-    img = Image.alpha_composite(img, Image.composite(night_k, Image.new("RGBA", (W, W), (0, 0, 0, 0)), stamp.split()[3]))
+    # two-tone Ramp-K: silver structure, glowing accent ramp
+    _draw_rampK(img, W, KFRAC * 0.92, SILVER, accent, glow_col=accent)
     return _finish(img, size)
 
 
@@ -185,8 +214,8 @@ def sig_minimal(size, accent=SILVER, mono=True):
     R = W * 0.40
     col = SILVER if mono else accent
     d.ellipse([cx - R, cy - R, cx + R, cy + R], outline=col + (255,), width=int(W * 0.05))
-    stamp, _ = _kstamp(W, KFRAC, col)
-    img.alpha_composite(stamp)
+    # keep the ramp slightly distinct even in mono via shape; one colour overall
+    _draw_rampK(img, W, KFRAC, col, col)
     return _finish(img, size)
 
 
@@ -197,7 +226,6 @@ def sig_kray(size, accent=CYAN, mono=False):
     hw, hh = W * 0.40, W * 0.46
     dia = _diamond(cx, cy, hw, hh)
     col = SILVER if mono else accent
-    # night diamond
     if not mono:
         mask = Image.new("L", (W, W), 0)
         ImageDraw.Draw(mask).polygon(dia, fill=255)
@@ -206,31 +234,28 @@ def sig_kray(size, accent=CYAN, mono=False):
         d.line(dia + [dia[0]], fill=accent + (255,), width=int(W * 0.016), joint="curve")
     else:
         d.line(dia + [dia[0]], fill=SILVER + (255,), width=int(W * 0.035), joint="curve")
-    # Ramp-K stem+leg in silver; upper ramp arm becomes a projector beam escaping
-    kcol = SILVER
+    # stem+leg silver; the ascending RAMP continues out as a projector beam
     frac = KFRAC * 0.92
-    stamp, (ox, oy, ksz) = _kstamp(W, frac, kcol, drop_upper=True)
-    img.alpha_composite(stamp)
-    jx, jy = _anchor(ox, oy, ksz, _K_JUNCTION)
-    tx, ty = _anchor(ox, oy, ksz, _K_TIP)
+    (jx, jy), (tx, ty) = _draw_rampK(img, W, frac, SILVER, SILVER, draw_ramp=False)
+    d = ImageDraw.Draw(img)
     dx, dy = tx - jx, ty - jy
     L = math.hypot(dx, dy); ux, uy = dx / L, dy / L
     px, py = -uy, ux
-    beamlen = W * 0.60
-    w0, w1 = W * 0.03, W * 0.105
+    beamlen = W * 0.62
+    w0, w1 = W * 0.035, W * 0.11   # thin at junction -> wide at the far end (ramp-up)
     bl = Image.new("RGBA", (W, W), (0, 0, 0, 0))
     bd = ImageDraw.Draw(bl)
-    nseg = 60
+    nseg = 64
     for i in range(nseg):
         t0, t1 = i / nseg, (i + 1) / nseg
-        a = int(255 * (1 - t0) ** 1.25)
+        a = int(255 * (1 - t0) ** 1.2)
         ww0 = w0 + (w1 - w0) * t0
         ww1 = w0 + (w1 - w0) * t1
         s = (jx + ux * beamlen * t0, jy + uy * beamlen * t0)
         e = (jx + ux * beamlen * t1, jy + uy * beamlen * t1)
         bd.polygon([(s[0] + px * ww0, s[1] + py * ww0), (e[0] + px * ww1, e[1] + py * ww1),
                     (e[0] - px * ww1, e[1] - py * ww1), (s[0] - px * ww0, s[1] - py * ww0)],
-                   fill=(col if not mono else SILVER) + (a,))
+                   fill=(SILVER if mono else accent) + (a,))
     img.alpha_composite(bl)
     d.ellipse([jx - W * 0.028, jy - W * 0.028, jx + W * 0.028, jy + W * 0.028], fill=col + (255,))
     return _finish(img, size)

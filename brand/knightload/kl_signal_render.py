@@ -14,13 +14,13 @@ INDIGO0, INDIGO1, INDIGO2 = k.INDIGO0, k.INDIGO1, k.INDIGO2
 
 DIRS = [
     ("1", "Signal Circle", s.sig_circle,
-     "K glowing in a night roundel · halo + slim rising signal shaft.", False),
+     "Night roundel; the K's ascending ramp-up glows as the signal + a slim rising shaft.", False),
     ("2", "Signal Diamond", s.sig_diamond,
-     "K knocked out of a glowing lozenge — projector beam, plot-point & badge in one.", True),
+     "Night lozenge with a glowing edge; the K's ramp-up fires as the lit signal inside (beam / plot-point / badge).", True),
     ("3", "Signal Minimal", s.sig_minimal,
-     "Circle + K, thin stroke, monochrome. The signal reduced to essence — 16px-proof.", False),
+     "Circle + K, thin monochrome stroke. The signal reduced to essence — 16px-proof.", False),
     ("4", "Signal K-Ray", s.sig_kray,
-     "The K's ascending arm fires off as a beam escaping the lozenge — load curve + signal.", False),
+     "The K's ascending ramp continues out as a projector beam escaping the lozenge — load curve + signal.", False),
 ]
 
 
@@ -63,8 +63,8 @@ def board():
     d = ImageDraw.Draw(img)
     d.text((60, 44), "KNIGHTLOAD", font=k.font(58, bold=True), fill=SILVER + (255,))
     k.tracked_text(d, (62, 116),
-                   "THE  LOAD-SIGNAL  ·  round 3.2  ·  the signal lights up, the knight answers  ·  pick one",
-                   k.font(24, bold=True), CYAN + (255,), tracking=3)
+                   "THE  LOAD-SIGNAL  ·  round 3.2b  ·  the K's ramp-up IS the signal (glows at night)  ·  pick one",
+                   k.font(23, bold=True), CYAN + (255,), tracking=2)
     d.line([60, 162, W - 60, 162], fill=INDIGO2 + (255,), width=3)
     colw = (W - 120) // 4
     y0 = 196

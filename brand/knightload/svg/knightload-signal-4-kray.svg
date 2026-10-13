@@ -1,17 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="512" height="512" role="img" aria-label="Knightload — Signal K-Ray">
   <title>Knightload — Signal K-Ray</title>
   <defs>
-    <linearGradient id="nightK" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#14162A"/>
-      <stop offset="100%" stop-color="#22305A"/>
-    </linearGradient>
-    <linearGradient id="beamK" gradientUnits="userSpaceOnUse" x1="390" y1="494" x2="878" y2="146">
-      <stop offset="0%" stop-color="#2EE6D6" stop-opacity="1"/>
-      <stop offset="100%" stop-color="#2EE6D6" stop-opacity="0"/>
-    </linearGradient>
+    <linearGradient id="nK" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="#14162A"/><stop offset="100%" stop-color="#22305A"/></linearGradient>
+    <linearGradient id="beamK" gradientUnits="userSpaceOnUse" x1="431" y1="533" x2="905" y2="134"><stop offset="0%" stop-color="#2EE6D6" stop-opacity="1"/><stop offset="100%" stop-color="#2EE6D6" stop-opacity="0"/></linearGradient>
   </defs>
-  <polygon points="500,40 900,500 500,960 100,500" fill="url(#nightK)" stroke="#2EE6D6" stroke-width="16" stroke-linejoin="round"/>
-  <rect x="318.5" y="296.5" width="71.5" height="407.0" rx="16.5" fill="#C7CDD6"/><polygon points="390.0,511.0 621.0,703.5 692.5,703.5 461.5,494.5" fill="#C7CDD6" />
-  <polygon points="407.4,518.9 939.3,231.2 817.2,60.3 372.6,470.1" fill="url(#beamK)" />
-  <circle cx="390" cy="494" r="28" fill="#2EE6D6"/>
+  <polygon points="500.0,40.0 900.0,500.0 500.0,960.0 100.0,500.0" fill="url(#nK)" stroke="#2EE6D6" stroke-width="16" stroke-linejoin="round"/>
+  <rect x="317.8" y="295.8" width="71.8" height="408.5" rx="16.6" fill="#C7CDD6"/><polygon points="389.6,511.0 610.4,704.2 687.7,704.2 466.9,500.0" fill="#C7CDD6"/>
+  <polygon points="453.5,559.9 976.1,217.9 834.4,49.6 408.5,506.3" fill="url(#beamK)"/>
+  <circle cx="431" cy="533" r="26" fill="#2EE6D6"/>
 </svg>
