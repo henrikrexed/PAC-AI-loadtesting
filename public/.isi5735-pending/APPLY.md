@@ -1,5 +1,16 @@
 # ISI-5735 — pending push to the public repo
 
+> **ISI-5758 design update (2026-10-13).** The combined `release.yml` captured in this
+> bundle/patch is **superseded** by the split design in
+> [`public/.github/workflows/`](../.github/workflows/) — `release.yml` (binaries + GitHub
+> Release + per-binary SBOM, **no image**) and `docker.yml` (the single GHCR push path,
+> with Trivy on every PR/tag + image SBOM). When pushing, apply those two files instead of
+> the bundle's `release.yml`. **Precondition both pipelines share:** the `engine/` package
+> that `docs/engine.md` specifies (and `examples/crewai-deepseek-agent/extract.json`) does
+> **not yet exist** — implement it (engine-packaging, ISI-5735) before tagging, or both
+> workflows fail at the build step. See `public/.github/workflows/README.md`.
+
+
 The deliverable commit is **built, verified, and committed** but could **not be pushed**:
 both git credentials (`~/.git-credentials` `x-access-token`, and `~/.github_pat`) return
 `403 denied to henrikrexed`. The App token from ISI-5665 was short-lived and has expired.
