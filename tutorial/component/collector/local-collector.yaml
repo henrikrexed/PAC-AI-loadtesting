@@ -1,0 +1,58 @@
+# Standalone collector config for the LOCAL (no-Kubernetes) tutorial path.
+# Same pipeline as k8s/collector.yaml: baggage promotion -> tutorial env tag -> your tenant.
+#
+# Run next to the app container:
+#   docker run -d --name agent-collector -p 4318:4318 \
+#     -v "$(pwd)/collector/local-collector.yaml":/etc/collector.yaml:ro \
+#     -e DT_OTLP_ENDPOINT -e DT_API_TOKEN \
+#     otel/opentelemetry-collector-contrib:0.135.0
+#
+# DT_OTLP_ENDPOINT = https://<your-environment>.live.dynatrace.com/api/v2/otlp
+# DT_API_TOKEN     = ingest token, scope ingestion:otlp:write
+receivers:
+  otlp:
+    protocols:
+      grpc: { endpoint: 0.0.0.0:4317 }
+      http: { endpoint: 0.0.0.0:4318 }
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 400
+    spike_limit_mib: 100
+  transform/baggage:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(attributes["synthetic"], "true") where attributes["baggage.synthetic"] == "true"
+  resource/tutorial:
+    attributes:
+      - { key: deployment.environment, value: ai-perf-tutorial, action: upsert }
+  cumulativetodelta: {}
+  batch:
+    send_batch_size: 1024
+    timeout: 5s
+exporters:
+  otlphttp/dynatrace:
+    endpoint: ${env:DT_OTLP_ENDPOINT}
+    headers:
+      Authorization: "Api-Token ${env:DT_API_TOKEN}"
+    compression: gzip
+    timeout: 30s
+    retry_on_failure: { enabled: true, initial_interval: 5s, max_interval: 30s, max_elapsed_time: 300s }
+service:
+  telemetry:
+    metrics: { level: basic }
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/baggage, resource/tutorial, batch]
+      exporters: [otlphttp/dynatrace]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/tutorial, batch]
+      exporters: [otlphttp/dynatrace]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, resource/tutorial, cumulativetodelta, batch]
+      exporters: [otlphttp/dynatrace]

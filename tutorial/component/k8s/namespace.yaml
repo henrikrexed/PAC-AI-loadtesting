@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agentapp
+  labels:
+    # Demo workload. Keep any service-mesh sidecar injection OFF so the span tree
+    # stays exactly the shape the app emits (no proxy spans interleaved).
+    istio-injection: disabled

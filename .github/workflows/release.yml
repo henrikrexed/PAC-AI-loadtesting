@@ -1,0 +1,156 @@
+name: release
+
+# Cross-platform engine binaries + GitHub Release.
+#
+# On every version tag `v*`, build the workload-model engine CLI as standalone,
+# dependency-light binaries — one per OS/arch — with PyInstaller (the engine is
+# pure-Python 3.12 with `jsonschema` as its only runtime dependency, so a one-file
+# bundle is clean and needs no native toolchain). Each binary gets a CycloneDX SBOM.
+# All assets are attached to a generated GitHub Release.
+#
+# The multi-arch container image is built and pushed by a SEPARATE pipeline
+# (`docker.yml`) so image builds also run on PRs/main for CI + Trivy scanning,
+# and so there is exactly ONE place that pushes to GHCR. This workflow does not
+# build or push any image.
+#
+# Trigger: push a tag like `v0.1.0`, or run manually (workflow_dispatch) to
+# smoke-test the build matrix without publishing a Release.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the GitHub Release and upload binary + SBOM assets
+
+env:
+  BINARY_NAME: workload-engine
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1. Cross-platform binaries. PyInstaller cannot cross-compile, so each target
+  #    is built on a native runner (linux arm64 uses the GA `ubuntu-24.04-arm`
+  #    runner — no QEMU emulation, which is slow and flaky for PyInstaller).
+  # ---------------------------------------------------------------------------
+  binaries:
+    name: binary (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-amd64
+            data_sep: ":"
+          - os: ubuntu-24.04-arm
+            target: linux-arm64
+            data_sep: ":"
+          - os: macos-13
+            target: darwin-amd64
+            data_sep: ":"
+          - os: macos-latest
+            target: darwin-arm64
+            data_sep: ":"
+          - os: windows-latest
+            target: windows-amd64
+            data_sep: ";"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install build deps
+        run: python -m pip install --upgrade pip pyinstaller "jsonschema>=4,<5"
+
+      - name: Build one-file binary
+        shell: bash
+        run: |
+          python -m PyInstaller --noconfirm --onefile --clean \
+            --name "$BINARY_NAME" \
+            --paths engine \
+            --add-data "engine/schema.json${{ matrix.data_sep }}." \
+            --hidden-import shaping --hidden-import archetypes \
+            --hidden-import clustering --hidden-import emit \
+            --hidden-import g0_gate --hidden-import source_merge \
+            engine/cli.py
+
+      - name: Smoke test the binary
+        shell: bash
+        run: |
+          BIN="dist/$BINARY_NAME"
+          [ "${{ matrix.target }}" = "windows-amd64" ] && BIN="dist/$BINARY_NAME.exe"
+          "$BIN" --help
+          "$BIN" --extract examples/crewai-deepseek-agent/extract.json --out out_smoke --mode agentic
+          test -f out_smoke/workload-model.json
+          test -f out_smoke/scenario-proposal.md
+
+      - name: Stage release asset
+        id: stage
+        shell: bash
+        run: |
+          mkdir -p staged
+          ASSET="${BINARY_NAME}-${{ matrix.target }}"
+          if [ "${{ matrix.target }}" = "windows-amd64" ]; then
+            cp "dist/$BINARY_NAME.exe" "staged/${ASSET}.exe"
+            echo "asset=staged/${ASSET}.exe" >> "$GITHUB_OUTPUT"
+          else
+            cp "dist/$BINARY_NAME" "staged/${ASSET}"
+            echo "asset=staged/${ASSET}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate SBOM for the binary
+        uses: anchore/sbom-action@v0
+        with:
+          file: ${{ steps.stage.outputs.asset }}
+          format: cyclonedx-json
+          output-file: staged/${{ env.BINARY_NAME }}-${{ matrix.target }}.cyclonedx.json
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.target }}
+          path: staged/*
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # 2. Publish the GitHub Release with every binary + SBOM attached.
+  #    Tag pushes only; runs after the whole matrix succeeds.
+  # ---------------------------------------------------------------------------
+  release:
+    name: github release
+    needs: [binaries]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List assets
+        run: ls -la dist
+
+      - name: Create release and attach assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            ## AI-Performance-Testing — workload-model engine ${{ github.ref_name }}
+
+            Standalone builds of the SCOPE-stage engine (`python -m engine.cli`).
+
+            **Binaries** (attached, each with a CycloneDX SBOM): `linux-amd64`,
+            `linux-arm64`, `darwin-amd64`, `darwin-arm64`, `windows-amd64`.
+
+            **Container image** (built + pushed by the `docker` workflow):
+            `docker pull ghcr.io/henrikrexed/ai-performance-testing:${{ github.ref_name }}`
+            (multi-arch: amd64 + arm64).
+
+            Install and usage: see
+            [`docs/engine.md`](https://github.com/henrikrexed/AI-Performance-Testing/blob/main/docs/engine.md).

@@ -1,0 +1,126 @@
+# Dedicated OpenTelemetry collector for the tutorial demo agent app.
+# Receives the app's OTLP export, stamps a distinctive deployment.environment (so DQL
+# can isolate this workload inside YOUR tenant), promotes the k6 `synthetic=true`
+# baggage to a queryable span attribute (required by the EXECUTE smoke gate), and
+# exports everything to your Dynatrace environment via OTLP.
+#
+# Pipeline (collector critical-rule order: memory_limiter FIRST, batch LAST):
+#   otlp -> memory_limiter -> transform/baggage -> resource/tutorial -> cumulativetodelta
+#        -> batch -> otlphttp/dynatrace
+#
+# Credentials come from the `dt-otlp` secret (see secret.example.yaml):
+#   tenantUrl = https://your-environment.live.dynatrace.com/api/v2/otlp   (ingest endpoint)
+#   apiToken  = an ingest token with scope `ingestion:otlp:write`
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agent-collector
+  namespace: agentapp
+  labels: { app: agent-collector }
+data:
+  collector.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    processors:
+      # CRITICAL RULE: memory_limiter MUST be the first processor.
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+        spike_limit_mib: 100
+      # Baggage -> attribute promotion. k6-synthesis tags synthetic requests with
+      # baggage `synthetic=true`; this transform lifts it to a top-level queryable
+      # attribute so DQL can separate test traffic (`synthetic == "true"`) from the
+      # baseline traffic this tutorial generates. Without it the EXECUTE smoke gate
+      # (criterion: >= 1 synthetic span visible) fails closed.
+      transform/baggage:
+        error_mode: ignore
+        trace_statements:
+          - context: span
+            statements:
+              - set(attributes["synthetic"], "true") where attributes["baggage.synthetic"] == "true"
+      # Distinctive tag so DQL can isolate THIS deployment from ambient traffic in
+      # your tenant. Change the value if you run multiple parallel tutorials.
+      resource/tutorial:
+        attributes:
+          - { key: deployment.environment, value: ai-perf-tutorial, action: upsert }
+      # Dynatrace OTLP expects DELTA temporality for cumulative sums/histograms.
+      cumulativetodelta: {}
+      # CRITICAL RULE: batch MUST be the last processor.
+      batch:
+        send_batch_size: 1024
+        timeout: 5s
+    exporters:
+      otlphttp/dynatrace:
+        endpoint: ${env:DT_OTLP_ENDPOINT}
+        headers:
+          Authorization: "Api-Token ${env:DT_API_TOKEN}"
+        compression: gzip
+        timeout: 30s
+        retry_on_failure: { enabled: true, initial_interval: 5s, max_interval: 30s, max_elapsed_time: 300s }
+        sending_queue: { enabled: true, queue_size: 5000 }
+    service:
+      telemetry:
+        metrics: { level: basic }
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/baggage, resource/tutorial, batch]
+          exporters: [otlphttp/dynatrace]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/tutorial, batch]
+          exporters: [otlphttp/dynatrace]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/tutorial, cumulativetodelta, batch]
+          exporters: [otlphttp/dynatrace]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-collector
+  namespace: agentapp
+  labels: { app: agent-collector }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: agent-collector } }
+  template:
+    metadata:
+      labels: { app: agent-collector }
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.135.0
+          args: ["--config=/etc/collector/collector.yaml"]
+          env:
+            - name: DT_OTLP_ENDPOINT
+              valueFrom: { secretKeyRef: { name: dt-otlp, key: tenantUrl } }
+            - name: DT_API_TOKEN
+              valueFrom: { secretKeyRef: { name: dt-otlp, key: apiToken } }
+          ports:
+            - { containerPort: 4317, name: otlp-grpc }
+            - { containerPort: 4318, name: otlp-http }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: config, mountPath: /etc/collector }
+      volumes:
+        - name: config
+          configMap: { name: agent-collector }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agent-collector
+  namespace: agentapp
+  labels: { app: agent-collector }
+spec:
+  selector: { app: agent-collector }
+  ports:
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+    - { name: otlp-http, port: 4318, targetPort: 4318 }

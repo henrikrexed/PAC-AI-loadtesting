@@ -1,0 +1,36 @@
+{
+  "checks": [
+    {
+      "detail": "0 5xx responses",
+      "id": "1-no-5xx",
+      "passed": true
+    },
+    {
+      "detail": "0 steps without downstream span, 0 404s",
+      "id": "2-routes-reachable",
+      "passed": true
+    },
+    {
+      "detail": "0 null-extract failures",
+      "id": "3-correlation",
+      "passed": true
+    },
+    {
+      "detail": "TVD=0.000 (max 0.30)",
+      "id": "4-journey-mix",
+      "passed": true
+    },
+    {
+      "detail": "42 synthetic==true spans in backend (baggage promotion confirmed)",
+      "id": "5-synthetic-visible",
+      "passed": true
+    },
+    {
+      "detail": "0 dropped iterations",
+      "id": "6-no-dropped",
+      "passed": true
+    }
+  ],
+  "gate": "V2b-smoke",
+  "passed": true
+}

@@ -1,0 +1,509 @@
+{
+  "kind": "record",
+  "id": "checkout",
+  "seed": 42,
+  "pii": "none (PII-free generators; emails on @synthetic.invalid)",
+  "count": 100,
+  "records": [
+    {
+      "email": "user0@synthetic.invalid",
+      "creditCardNumber": "ccNumber-0",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user1@synthetic.invalid",
+      "creditCardNumber": "ccNumber-1",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user2@synthetic.invalid",
+      "creditCardNumber": "ccNumber-2",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user3@synthetic.invalid",
+      "creditCardNumber": "ccNumber-3",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user4@synthetic.invalid",
+      "creditCardNumber": "ccNumber-4",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user5@synthetic.invalid",
+      "creditCardNumber": "ccNumber-5",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user6@synthetic.invalid",
+      "creditCardNumber": "ccNumber-6",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user7@synthetic.invalid",
+      "creditCardNumber": "ccNumber-7",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user8@synthetic.invalid",
+      "creditCardNumber": "ccNumber-8",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user9@synthetic.invalid",
+      "creditCardNumber": "ccNumber-9",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user10@synthetic.invalid",
+      "creditCardNumber": "ccNumber-10",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user11@synthetic.invalid",
+      "creditCardNumber": "ccNumber-11",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user12@synthetic.invalid",
+      "creditCardNumber": "ccNumber-12",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user13@synthetic.invalid",
+      "creditCardNumber": "ccNumber-13",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user14@synthetic.invalid",
+      "creditCardNumber": "ccNumber-14",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user15@synthetic.invalid",
+      "creditCardNumber": "ccNumber-15",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user16@synthetic.invalid",
+      "creditCardNumber": "ccNumber-16",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user17@synthetic.invalid",
+      "creditCardNumber": "ccNumber-17",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user18@synthetic.invalid",
+      "creditCardNumber": "ccNumber-18",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user19@synthetic.invalid",
+      "creditCardNumber": "ccNumber-19",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user20@synthetic.invalid",
+      "creditCardNumber": "ccNumber-20",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user21@synthetic.invalid",
+      "creditCardNumber": "ccNumber-21",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user22@synthetic.invalid",
+      "creditCardNumber": "ccNumber-22",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user23@synthetic.invalid",
+      "creditCardNumber": "ccNumber-23",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user24@synthetic.invalid",
+      "creditCardNumber": "ccNumber-24",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user25@synthetic.invalid",
+      "creditCardNumber": "ccNumber-25",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user26@synthetic.invalid",
+      "creditCardNumber": "ccNumber-26",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user27@synthetic.invalid",
+      "creditCardNumber": "ccNumber-27",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user28@synthetic.invalid",
+      "creditCardNumber": "ccNumber-28",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user29@synthetic.invalid",
+      "creditCardNumber": "ccNumber-29",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user30@synthetic.invalid",
+      "creditCardNumber": "ccNumber-30",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user31@synthetic.invalid",
+      "creditCardNumber": "ccNumber-31",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user32@synthetic.invalid",
+      "creditCardNumber": "ccNumber-32",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user33@synthetic.invalid",
+      "creditCardNumber": "ccNumber-33",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user34@synthetic.invalid",
+      "creditCardNumber": "ccNumber-34",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user35@synthetic.invalid",
+      "creditCardNumber": "ccNumber-35",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user36@synthetic.invalid",
+      "creditCardNumber": "ccNumber-36",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user37@synthetic.invalid",
+      "creditCardNumber": "ccNumber-37",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user38@synthetic.invalid",
+      "creditCardNumber": "ccNumber-38",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user39@synthetic.invalid",
+      "creditCardNumber": "ccNumber-39",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user40@synthetic.invalid",
+      "creditCardNumber": "ccNumber-40",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user41@synthetic.invalid",
+      "creditCardNumber": "ccNumber-41",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user42@synthetic.invalid",
+      "creditCardNumber": "ccNumber-42",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user43@synthetic.invalid",
+      "creditCardNumber": "ccNumber-43",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user44@synthetic.invalid",
+      "creditCardNumber": "ccNumber-44",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user45@synthetic.invalid",
+      "creditCardNumber": "ccNumber-45",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user46@synthetic.invalid",
+      "creditCardNumber": "ccNumber-46",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user47@synthetic.invalid",
+      "creditCardNumber": "ccNumber-47",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user48@synthetic.invalid",
+      "creditCardNumber": "ccNumber-48",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user49@synthetic.invalid",
+      "creditCardNumber": "ccNumber-49",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user50@synthetic.invalid",
+      "creditCardNumber": "ccNumber-50",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user51@synthetic.invalid",
+      "creditCardNumber": "ccNumber-51",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user52@synthetic.invalid",
+      "creditCardNumber": "ccNumber-52",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user53@synthetic.invalid",
+      "creditCardNumber": "ccNumber-53",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user54@synthetic.invalid",
+      "creditCardNumber": "ccNumber-54",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user55@synthetic.invalid",
+      "creditCardNumber": "ccNumber-55",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user56@synthetic.invalid",
+      "creditCardNumber": "ccNumber-56",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user57@synthetic.invalid",
+      "creditCardNumber": "ccNumber-57",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user58@synthetic.invalid",
+      "creditCardNumber": "ccNumber-58",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user59@synthetic.invalid",
+      "creditCardNumber": "ccNumber-59",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user60@synthetic.invalid",
+      "creditCardNumber": "ccNumber-60",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user61@synthetic.invalid",
+      "creditCardNumber": "ccNumber-61",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user62@synthetic.invalid",
+      "creditCardNumber": "ccNumber-62",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user63@synthetic.invalid",
+      "creditCardNumber": "ccNumber-63",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user64@synthetic.invalid",
+      "creditCardNumber": "ccNumber-64",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user65@synthetic.invalid",
+      "creditCardNumber": "ccNumber-65",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user66@synthetic.invalid",
+      "creditCardNumber": "ccNumber-66",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user67@synthetic.invalid",
+      "creditCardNumber": "ccNumber-67",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user68@synthetic.invalid",
+      "creditCardNumber": "ccNumber-68",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user69@synthetic.invalid",
+      "creditCardNumber": "ccNumber-69",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user70@synthetic.invalid",
+      "creditCardNumber": "ccNumber-70",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user71@synthetic.invalid",
+      "creditCardNumber": "ccNumber-71",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user72@synthetic.invalid",
+      "creditCardNumber": "ccNumber-72",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user73@synthetic.invalid",
+      "creditCardNumber": "ccNumber-73",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user74@synthetic.invalid",
+      "creditCardNumber": "ccNumber-74",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user75@synthetic.invalid",
+      "creditCardNumber": "ccNumber-75",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user76@synthetic.invalid",
+      "creditCardNumber": "ccNumber-76",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user77@synthetic.invalid",
+      "creditCardNumber": "ccNumber-77",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user78@synthetic.invalid",
+      "creditCardNumber": "ccNumber-78",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user79@synthetic.invalid",
+      "creditCardNumber": "ccNumber-79",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user80@synthetic.invalid",
+      "creditCardNumber": "ccNumber-80",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user81@synthetic.invalid",
+      "creditCardNumber": "ccNumber-81",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user82@synthetic.invalid",
+      "creditCardNumber": "ccNumber-82",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user83@synthetic.invalid",
+      "creditCardNumber": "ccNumber-83",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user84@synthetic.invalid",
+      "creditCardNumber": "ccNumber-84",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user85@synthetic.invalid",
+      "creditCardNumber": "ccNumber-85",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user86@synthetic.invalid",
+      "creditCardNumber": "ccNumber-86",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user87@synthetic.invalid",
+      "creditCardNumber": "ccNumber-87",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user88@synthetic.invalid",
+      "creditCardNumber": "ccNumber-88",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user89@synthetic.invalid",
+      "creditCardNumber": "ccNumber-89",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user90@synthetic.invalid",
+      "creditCardNumber": "ccNumber-90",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user91@synthetic.invalid",
+      "creditCardNumber": "ccNumber-91",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user92@synthetic.invalid",
+      "creditCardNumber": "ccNumber-92",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user93@synthetic.invalid",
+      "creditCardNumber": "ccNumber-93",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user94@synthetic.invalid",
+      "creditCardNumber": "ccNumber-94",
+      "currencyCode": "GBP"
+    },
+    {
+      "email": "user95@synthetic.invalid",
+      "creditCardNumber": "ccNumber-95",
+      "currencyCode": "EUR"
+    },
+    {
+      "email": "user96@synthetic.invalid",
+      "creditCardNumber": "ccNumber-96",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user97@synthetic.invalid",
+      "creditCardNumber": "ccNumber-97",
+      "currencyCode": "JPY"
+    },
+    {
+      "email": "user98@synthetic.invalid",
+      "creditCardNumber": "ccNumber-98",
+      "currencyCode": "USD"
+    },
+    {
+      "email": "user99@synthetic.invalid",
+      "creditCardNumber": "ccNumber-99",
+      "currencyCode": "EUR"
+    }
+  ]
+}

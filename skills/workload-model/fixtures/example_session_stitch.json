@@ -1,0 +1,66 @@
+{
+  "_comment": "SYNTHETIC example of an OTel `session.id` span-stitch extraction. All service names and numbers are invented; no real telemetry.",
+  "window": "now()-24h (synthetic)",
+  "overall": {
+    "totalSpans": 48000000,
+    "sessionSpans": 20600,
+    "overallCoveragePct": 0.04
+  },
+  "coverage_rows": [
+    {
+      "service": "ads",
+      "totalSpans": 100000,
+      "sessionSpans": 20390,
+      "sessions": 5000,
+      "meanActions": 5.25
+    },
+    {
+      "service": "chat-agent-service",
+      "totalSpans": 2400,
+      "sessionSpans": 132,
+      "sessions": 131,
+      "meanActions": 1.007
+    },
+    {
+      "service": "checkout",
+      "totalSpans": 5000,
+      "sessionSpans": 0,
+      "sessions": 0
+    }
+  ],
+  "ad_think_time_ms": {
+    "n": 19000,
+    "min": 900.0,
+    "p50": 7200.0,
+    "p90": 22000.0,
+    "p99": 41000.0,
+    "max": 58000.0,
+    "mean": 11000.0
+  },
+  "ad_session_length": {
+    "sessions": 5000,
+    "actionsPerSession": {
+      "n": 5000,
+      "min": 1.0,
+      "p50": 5.0,
+      "p90": 9.0,
+      "p99": 12.0,
+      "max": 15.0,
+      "mean": 5.25
+    },
+    "durationSeconds": {
+      "n": 5000,
+      "min": 2.0,
+      "p50": 47.0,
+      "p90": 96.0,
+      "p99": 150.0,
+      "max": 220.0,
+      "mean": 55.0
+    }
+  },
+  "ad_exponential_fit": {
+    "meanMs": 11000.0,
+    "medianMeanRatio": 0.655,
+    "fit": "exponential"
+  }
+}

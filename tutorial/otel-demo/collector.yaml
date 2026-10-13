@@ -1,0 +1,136 @@
+# Tutorial collector — baggage promotion + Dynatrace OTLP export
+#
+# This is the one piece of backend wiring the methodology needs: it promotes the
+# OTel baggage `synthetic=true` (carried by generated load) into a first-class,
+# queryable span attribute so the ANALYZE step can separate test traffic from the
+# real baseline in DQL. It also stamps a distinctive environment tag so you can
+# isolate this demo's telemetry from anything else in your tenant.
+#
+# Pipeline (critical-rule order: memory_limiter FIRST, batch LAST):
+#   otlp -> memory_limiter -> transform/baggage (promote) -> resource/demo -> batch
+#         -> [ otlphttp/dynatrace, otlphttp/local (optional, preserve local stack) ]
+#
+# Why the promotion matters: baggage is a context-propagation mechanism, not a
+# queryable attribute by default. Without this `transform/baggage` step the
+# ANALYZE filter `synthetic == true` matches nothing. See docs/methodology.md.
+#
+# Deploy into the namespace of the app you are load-testing (here: `demo-app`),
+# then point that app's OTLP exporter at the `demo-lt-collector` Service.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-lt-collector
+  namespace: demo-app
+  labels: { app: demo-lt-collector }
+data:
+  collector.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc: { endpoint: 0.0.0.0:4317 }
+          http: { endpoint: 0.0.0.0:4318 }
+    processors:
+      # CRITICAL RULE: memory_limiter MUST be the first processor.
+      memory_limiter:
+        check_interval: 1s
+        limit_mib: 400
+        spike_limit_mib: 100
+      # Baggage -> attribute promotion. Reads the span attribute the SDK/probe
+      # carries (baggage.synthetic) and lifts it to a top-level queryable attr.
+      transform/baggage:
+        error_mode: ignore
+        trace_statements:
+          - context: span
+            statements:
+              - set(attributes["synthetic"], "true") where attributes["baggage.synthetic"] == "true"
+      # Distinctive tag so DQL can isolate THIS deployment from everything else.
+      resource/demo:
+        attributes:
+          - { key: deployment.environment, value: demo-loadtest, action: upsert }
+      # DT OTLP requires DELTA temporality for cumulative sums/histograms.
+      cumulativetodelta: {}
+      # CRITICAL RULE: batch MUST be the last processor.
+      batch:
+        send_batch_size: 1024
+        timeout: 5s
+    exporters:
+      otlphttp/dynatrace:
+        endpoint: ${env:DT_OTLP_ENDPOINT}
+        headers:
+          Authorization: "Api-Token ${env:DT_OTLP_API_TOKEN}"
+        compression: gzip
+        timeout: 30s
+        retry_on_failure: { enabled: true, initial_interval: 5s, max_interval: 30s, max_elapsed_time: 300s }
+        sending_queue: { enabled: true, queue_size: 5000 }
+      # Optional: preserve an existing local telemetry stack (Tempo/LGTM/etc.) —
+      # non-destructive fan-out. Remove this exporter (and the pipeline refs) if
+      # you only export to Dynatrace.
+      otlphttp/local:
+        endpoint: http://otel-collector.observability.svc.cluster.local:4318
+        compression: gzip
+        retry_on_failure: { enabled: true }
+    service:
+      telemetry:
+        metrics: { level: basic }
+      pipelines:
+        traces:
+          receivers: [otlp]
+          processors: [memory_limiter, transform/baggage, resource/demo, batch]
+          exporters: [otlphttp/dynatrace, otlphttp/local]
+        logs:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/demo, batch]
+          exporters: [otlphttp/dynatrace, otlphttp/local]
+        metrics:
+          receivers: [otlp]
+          processors: [memory_limiter, resource/demo, cumulativetodelta, batch]
+          exporters: [otlphttp/dynatrace, otlphttp/local]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-lt-collector
+  namespace: demo-app
+  labels: { app: demo-lt-collector }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: demo-lt-collector } }
+  template:
+    metadata:
+      labels: { app: demo-lt-collector }
+      annotations: { sidecar.istio.io/inject: "false" }
+    spec:
+      containers:
+        - name: collector
+          image: otel/opentelemetry-collector-contrib:0.135.0
+          args: ["--config=/etc/collector/collector.yaml"]
+          env:
+            # Create this secret from your .env — see k8s/secret.example.yaml.
+            - name: DT_OTLP_ENDPOINT
+              valueFrom: { secretKeyRef: { name: dt-otlp-token, key: tenantUrl } }
+            - name: DT_OTLP_API_TOKEN
+              valueFrom: { secretKeyRef: { name: dt-otlp-token, key: apiToken } }
+          ports:
+            - { containerPort: 4317, name: otlp-grpc }
+            - { containerPort: 4318, name: otlp-http }
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }
+          volumeMounts:
+            - { name: config, mountPath: /etc/collector }
+      volumes:
+        - name: config
+          configMap: { name: demo-lt-collector }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-lt-collector
+  namespace: demo-app
+  labels: { app: demo-lt-collector }
+spec:
+  selector: { app: demo-lt-collector }
+  ports:
+    - { name: otlp-grpc, port: 4317, targetPort: 4317 }
+    - { name: otlp-http, port: 4318, targetPort: 4318 }

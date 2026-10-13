@@ -1,0 +1,14 @@
+{
+  "name": "k6-synthesis",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SYNTHESIZE skill: approved workload-model.json -> k6 scripts + payload pools, with G2 chaining, G4 cache-avoidance payloads, synthetic=true OTel emission, and the V2a static checker.",
+  "bin": {
+    "k6-synthesis": "bin/synthesize.mjs"
+  },
+  "scripts": {
+    "synthesize": "node bin/synthesize.mjs",
+    "test": "node --test"
+  }
+}

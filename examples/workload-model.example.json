@@ -1,0 +1,240 @@
+{
+  "apiVersion": "loadtest.isi/v1alpha1",
+  "kind": "WorkloadModel",
+  "metadata": {
+    "name": "shop-frontend-example",
+    "targetService": "shop-frontend",
+    "environment": "demo-tenant",
+    "generatedAt": "2026-01-15T00:00:00Z",
+    "source": {
+      "tool": "dynatrace-dql",
+      "timeframe": "2026-01-14T00:00Z/2026-01-15T00:00Z (deploy-free/incident-free 24h window)",
+      "timeframeNotes": "SYNTHETIC EXAMPLE — numbers are representative, not extracted from any real tenant. Noise classifier dropped health/metrics probes and background pollers.",
+      "queries": [
+        "fetch spans | filter request.is_root_span==true | summarize count() by entryService,entryOp  (G1-C front-end discovery)",
+        "fetch spans | filter span.kind=='server' && service.name=='shop-frontend' | summarize percentile(duration,50/95/99) by span.name  (route baselines)",
+        "fetch spans | filter is_root_span | summarize count() by bin(start_time,1m) | summarize avg,stddev  (G3-B CoV)"
+      ],
+      "evidenceSources": ["span"],
+      "accessLogAvailability": "unavailable",
+      "samplingRatio": 1.0,
+      "rumSessionCoverage": {
+        "hasRumSignal": true,
+        "totalSessions": 20000,
+        "userEventsAccessible": true,
+        "apps": [
+          {
+            "app": "shop-frontend",
+            "type": "web",
+            "sessions": 18500,
+            "actionsP50": 6,
+            "durationP50Seconds": 95,
+            "bounceRate": 0.11
+          },
+          {
+            "app": "shop-mobile",
+            "type": "mobile",
+            "sessions": 1500,
+            "actionsP50": 4,
+            "durationP50Seconds": 62,
+            "bounceRate": 0.19
+          }
+        ]
+      }
+    }
+  },
+  "spec": {
+    "arrivalProfile": {
+      "model": "open",
+      "stages": [
+        { "duration": "3m", "rate": 0.5, "shape": "ramp_up" },
+        { "duration": "20m", "rate": 2.0, "shape": "plateau" },
+        { "duration": "2m", "rate": 0.0, "shape": "ramp_down" }
+      ],
+      "littlesLawCheck": {
+        "expectedConcurrency": 4.2,
+        "observedConcurrency": 4.1,
+        "ratio": 1.024
+      }
+    },
+    "journeys": [
+      {
+        "id": "browser",
+        "description": "Browser — search & browse (no order) — read-only; representative synthetic mix derived from the RUM-primary journey template.",
+        "weight": 0.85,
+        "entrypoint": "GET /",
+        "codeRef": "src/frontend/pages/index.tsx#Home",
+        "evidenceSource": "both",
+        "steps": [
+          {
+            "id": "s1",
+            "service": "shop-frontend",
+            "operation": "GET /",
+            "callType": "http",
+            "request": { "method": "GET", "pathTemplate": "/" },
+            "evidenceSource": "both",
+            "thinkTime": { "distribution": "exponential", "meanMs": 2400, "minMs": 300, "maxMs": 31000 },
+            "baseline": { "p50Ms": 18, "p95Ms": 42, "p99Ms": 70, "errorRate": 0.001 }
+          },
+          {
+            "id": "s2",
+            "service": "product-service",
+            "operation": "GET /api/products/{productId}",
+            "callType": "http",
+            "request": { "method": "GET", "pathTemplate": "/api/products/{productId}" },
+            "payloadRef": "product",
+            "evidenceSource": "both",
+            "thinkTime": { "distribution": "exponential", "meanMs": 3600, "minMs": 400, "maxMs": 65000 },
+            "baseline": { "p50Ms": 22, "p95Ms": 55, "p99Ms": 90, "errorRate": 0.002 }
+          },
+          {
+            "id": "s3",
+            "service": "recommendation-service",
+            "operation": "GET /api/recommendations",
+            "callType": "http",
+            "request": { "method": "GET", "pathTemplate": "/api/recommendations" },
+            "evidenceSource": "span",
+            "baseline": { "p50Ms": 35, "p95Ms": 80, "p99Ms": 140, "errorRate": 0.003 }
+          }
+        ],
+        "baseline": { "p50Ms": 22, "p95Ms": 80, "p99Ms": 140, "errorRate": 0.002 }
+      },
+      {
+        "id": "buyer",
+        "description": "Buyer — browse, add to cart, place order — places an order; synthetic checkout flow with request chaining (G2) and a seeded cart→checkout correlation.",
+        "weight": 0.15,
+        "entrypoint": "GET /api/products/{productId}",
+        "codeRef": "src/frontend/pages/api/products/[productId].ts#handler",
+        "evidenceSource": "both",
+        "steps": [
+          {
+            "id": "s1",
+            "service": "product-service",
+            "operation": "GET /api/products/{productId}",
+            "callType": "http",
+            "request": { "method": "GET", "pathTemplate": "/api/products/{productId}" },
+            "payloadRef": "product",
+            "evidenceSource": "both",
+            "thinkTime": { "distribution": "exponential", "meanMs": 3600, "minMs": 400, "maxMs": 65000 },
+            "baseline": { "p50Ms": 22, "p95Ms": 55, "p99Ms": 90, "errorRate": 0.002 }
+          },
+          {
+            "id": "s2",
+            "service": "cart-service",
+            "operation": "POST /api/cart",
+            "callType": "http",
+            "request": { "method": "POST", "pathTemplate": "/api/cart" },
+            "payloadRef": "cartItem",
+            "evidenceSource": "both",
+            "thinkTime": { "distribution": "exponential", "meanMs": 1300, "minMs": 200, "maxMs": 22000 },
+            "dependsOn": ["s1"],
+            "baseline": { "p50Ms": 28, "p95Ms": 65, "p99Ms": 110, "errorRate": 0.004 },
+            "correlates": [
+              {
+                "sourceStepId": "s1",
+                "extract": { "from": "body_json", "path": "$.id" },
+                "inject": { "into": "body_field", "as": "productId" }
+              }
+            ]
+          },
+          {
+            "id": "s3",
+            "service": "cart-service",
+            "operation": "GET /api/cart",
+            "callType": "http",
+            "request": { "method": "GET", "pathTemplate": "/api/cart" },
+            "evidenceSource": "both",
+            "dependsOn": ["s2"],
+            "baseline": { "p50Ms": 20, "p95Ms": 48, "p99Ms": 80, "errorRate": 0.002 },
+            "correlates": [
+              {
+                "sourceStepId": "s2",
+                "extract": { "from": "header", "path": "set-cookie:session" },
+                "inject": { "into": "header", "as": "cookie" }
+              }
+            ]
+          },
+          {
+            "id": "s4",
+            "service": "checkout-service",
+            "operation": "POST /api/checkout",
+            "callType": "http",
+            "request": { "method": "POST", "pathTemplate": "/api/checkout" },
+            "payloadRef": "checkout",
+            "evidenceSource": "both",
+            "thinkTime": { "distribution": "exponential", "meanMs": 3000, "minMs": 500, "maxMs": 4600 },
+            "dependsOn": ["s2"],
+            "baseline": { "p50Ms": 180, "p95Ms": 420, "p99Ms": 650, "errorRate": 0.008 },
+            "correlates": [
+              {
+                "sourceStepId": "s2",
+                "extract": { "from": "header", "path": "set-cookie:session" },
+                "inject": { "into": "header", "as": "cookie" }
+              }
+            ]
+          }
+        ],
+        "baseline": { "p50Ms": 28, "p95Ms": 420, "p99Ms": 650, "errorRate": 0.004 }
+      }
+    ],
+    "payloads": {
+      "product": {
+        "fields": [
+          {
+            "name": "productId",
+            "type": "enum",
+            "generator": "const",
+            "values": ["SKU-0001", "SKU-0002", "SKU-0003", "SKU-0004", "SKU-0005", "SKU-0006", "SKU-0007", "SKU-0008", "SKU-0009", "SKU-0010"],
+            "distribution": "zipf",
+            "target": { "into": "path_param", "as": "productId" }
+          }
+        ],
+        "seed": 42,
+        "cacheProfile": {
+          "targetHitRatio": 0.95,
+          "keyCardinality": 10,
+          "distributionAlpha": 0.3,
+          "backingStoreSeeded": true
+        }
+      },
+      "cartItem": {
+        "fields": [
+          { "name": "productId", "type": "string", "generator": "const", "values": ["SKU-0001"] },
+          { "name": "quantity", "type": "int", "generator": "random", "distribution": "uniform" }
+        ],
+        "seed": 42
+      },
+      "checkout": {
+        "fields": [
+          { "name": "email", "type": "string", "generator": "faker:email" },
+          { "name": "creditCardNumber", "type": "string", "generator": "faker:ccNumber" },
+          {
+            "name": "currencyCode",
+            "type": "enum",
+            "generator": "const",
+            "values": ["USD", "EUR", "GBP", "JPY"],
+            "distribution": "weighted"
+          }
+        ],
+        "seed": 42
+      }
+    },
+    "caps": {
+      "maxRps": 5,
+      "maxVus": 50,
+      "maxDuration": "30m"
+    },
+    "coverage": 1.0
+  },
+  "status": {
+    "revision": 1,
+    "hash": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    "approval": {
+      "revision": 1,
+      "decision": "approved",
+      "decisionBy": "example-maintainer",
+      "decisionAt": "2026-01-15T12:00:00Z",
+      "confirmationRef": "example:synthetic:no-real-approval"
+    }
+  }
+}

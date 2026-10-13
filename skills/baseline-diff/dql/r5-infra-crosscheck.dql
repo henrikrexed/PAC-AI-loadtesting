@@ -1,0 +1,58 @@
+-- =============================================================================
+-- baseline-diff · R5 INFRA CROSS-CHECK (methodology §11 R5)
+-- -----------------------------------------------------------------------------
+-- R5: "we extract AND validate from the same telemetry; shared blind spots
+--      (async fan-out, websockets, fire-and-forget) are invisible on both sides."
+-- Mitigation (NOT optional): cross-check at least one run dimension against
+-- INFRA metrics — a DIFFERENT data plane than the app's OTLP spans.
+--
+-- The metrics below come from Dynatrace KUBERNETES MONITORING (ActiveGate /
+-- cloud-native), independent of the application's OTLP span pipeline. Verified
+-- validated live:
+--   dt.kubernetes.container.cpu_usage          (92 series live, 12,328 pts/2h)
+--   dt.kubernetes.pod.network_received_data    (46 series)
+--   dt.kubernetes.pod.network_transmitted_data (49 series)
+--
+-- NOTE on the T0 collector: deploy/otel-demo/pac-lt-collector.yaml is OTLP-only
+-- (zero RBAC — no kubeletstats / hostmetrics). So the infra plane MUST come from
+-- Dynatrace K8s monitoring (above), NOT from the app collector. If K8s
+-- monitoring is absent for the target workload, the cross-check is UNAVAILABLE
+-- → record available:false (never a silent pass; §3.5 / build_shape_diff.py
+-- blocks a clean accept when require_r5 is on).
+--
+-- Bind: $workload (target front-end workload, e.g. "frontend"),
+--       IDLE window  = a pre-run quiet window,
+--       RUN  window  = the synthetic run window.
+-- The cross-check PASSES when, for a telemetry load claim, CPU rises materially
+-- (duringRun / idleBaseline >= minRiseRatio, default 2.0) — proving the load was
+-- physically real, not a telemetry artifact.
+-- =============================================================================
+
+-- (R5-CPU-RUN) target workload CPU during the synthetic run window
+timeseries cpuRun = avg(dt.kubernetes.container.cpu_usage),
+  from: $RUN_FROM, to: $RUN_TO,
+  filter: { k8s.workload.name == $workload }
+| fieldsAdd duringRun = arrayAvg(cpuRun)
+
+-- (R5-CPU-IDLE) same workload CPU during a pre-run idle window (baseline floor)
+timeseries cpuIdle = avg(dt.kubernetes.container.cpu_usage),
+  from: $IDLE_FROM, to: $IDLE_TO,
+  filter: { k8s.workload.name == $workload }
+| fieldsAdd idleBaseline = arrayAvg(cpuIdle)
+
+-- (R5-NET-RUN) optional second signal — pod network ingress during the run.
+--   A second independent infra dimension strengthens the cross-check.
+timeseries rx = avg(dt.kubernetes.pod.network_received_data),
+  from: $RUN_FROM, to: $RUN_TO,
+  filter: { k8s.workload.name == $workload }
+| fieldsAdd rxDuringRun = arrayAvg(rx)
+
+-- Emit into diff-input.json r5CrossCheck:
+--   { "available": true,
+--     "metric": "dt.kubernetes.container.cpu_usage",
+--     "source": "dynatrace-kubernetes-monitoring",
+--     "workload": "<$workload>",
+--     "idleBaseline": <idleBaseline>, "duringRun": <duringRun>,
+--     "telemetryClaimsLoad": true }
+-- If no K8s-monitoring series exist for $workload:
+--   { "available": false }

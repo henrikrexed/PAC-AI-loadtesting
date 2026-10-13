@@ -1,0 +1,92 @@
+{
+  "run": "2026-01-15T11-30-00Z",
+  "baselineTimeframe": "2026-01-14T00:00Z/2026-01-15T00:00Z",
+  "scalingFactor": 0.25,
+  "samplingFactor": {
+    "prod": 1.0,
+    "test": 1.0
+  },
+  "syntheticProbeCount": 2048,
+  "dimensions": {
+    "arrivalShape": {
+      "metric": "wmape",
+      "value": 0.031,
+      "tolerance": 0.2,
+      "scalingFactor": 0.25,
+      "alignedBins": 20,
+      "pass": true
+    },
+    "latency": {
+      "p50Rel": 0.09,
+      "p95Rel": 0.14,
+      "p99Rel": 0.21,
+      "tolerances": {
+        "p50Rel": 0.25,
+        "p95Rel": 0.3,
+        "p99Rel": 0.35
+      },
+      "perJourney": {
+        "browser": {
+          "p50Rel": 0.08,
+          "p95Rel": 0.12,
+          "p99Rel": 0.18
+        },
+        "buyer": {
+          "p50Rel": 0.11,
+          "p95Rel": 0.16,
+          "p99Rel": 0.24
+        }
+      },
+      "pass": true
+    },
+    "serviceFanout": {
+      "edgePresence": 1.0,
+      "edgePresenceTolerance": 0.9,
+      "rateRatioRange": [
+        0.97,
+        1.08
+      ],
+      "rateRatioBand": [
+        0.5,
+        2.0
+      ],
+      "missingEdges": [],
+      "outOfBandEdges": [],
+      "pass": true
+    },
+    "errorRate": {
+      "deltaPp": 0.3,
+      "tolerancePp": 1.0,
+      "perJourney": {
+        "browser": 0.1,
+        "buyer": 0.4
+      },
+      "pass": true
+    },
+    "journeyMix": {
+      "tvd": 0.02,
+      "tolerance": 0.15,
+      "pass": true
+    }
+  },
+  "r5CrossCheck": {
+    "metric": "dt.kubernetes.container.cpu_usage",
+    "source": "dynatrace-kubernetes-monitoring",
+    "plane": "infra (non-telemetry)",
+    "workload": "shop-frontend",
+    "idleBaseline": 0.022,
+    "duringRun": 0.19,
+    "riseRatio": 8.636,
+    "minRiseRatio": 2.0,
+    "telemetryClaimsLoad": true,
+    "reason": "infra signal corroborates telemetry load",
+    "available": true,
+    "pass": true
+  },
+  "decision": "accept",
+  "iteration": 1,
+  "failedDimensions": [],
+  "classifications": [],
+  "reason": "SYNTHETIC EXAMPLE — all six shape-diff dimensions within tolerance; R5 infra cross-check corroborates telemetry-observed load. Representative numbers, not from any real run.",
+  "runTimeframe": "2026-01-15T11:30Z/2026-01-15T11:55Z"
+}

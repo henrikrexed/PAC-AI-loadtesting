@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: crewai-deepseek-agent
+  namespace: agentapp
+  labels: { app: crewai-deepseek-agent }
+spec:
+  selector: { app: crewai-deepseek-agent }
+  ports:
+    - { name: http, port: 80, targetPort: 8080 }

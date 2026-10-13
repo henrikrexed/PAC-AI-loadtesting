@@ -1,0 +1,157 @@
+{
+  "apiVersion": "loadtest.isi/v1alpha1",
+  "kind": "WorkloadModel",
+  "metadata": {
+    "name": "shop-checkout",
+    "targetService": "frontend-proxy",
+    "environment": "example",
+    "generatedAt": "2026-10-09T00:00:00Z",
+    "source": {
+      "tool": "dtctl",
+      "timeframe": "2026-10-01T00:00Z/2026-10-08T00:00Z",
+      "timeframeNotes": "deploy/incident windows excluded",
+      "queries": ["G1-C", "G3-A", "G3-B"]
+    }
+  },
+  "spec": {
+    "arrivalProfile": {
+      "model": "open",
+      "stages": [
+        { "duration": "5m", "rate": 100, "shape": "ramp_up" },
+        { "duration": "10m", "rate": 100, "shape": "plateau" },
+        { "duration": "5m", "rate": 0, "shape": "ramp_down" }
+      ],
+      "littlesLawCheck": {
+        "expectedConcurrency": 24,
+        "observedConcurrency": 22,
+        "ratio": 1.09
+      }
+    },
+    "journeys": [
+      {
+        "id": "browse",
+        "description": "Catalogue browse: list then view a product",
+        "weight": 0.6,
+        "entrypoint": "GET /api/products",
+        "codeRef": "src/frontend/routes/products.ts#listProducts",
+        "steps": [
+          {
+            "id": "list-products",
+            "service": "frontend-proxy",
+            "operation": "GET /api/products",
+            "callType": "http",
+            "codeRef": "src/frontend/routes/products.ts#listProducts"
+          },
+          {
+            "id": "view-product",
+            "service": "frontend-proxy",
+            "operation": "GET /api/products/{id}",
+            "callType": "http",
+            "codeRef": "src/frontend/routes/products.ts#getProduct",
+            "thinkTime": { "distribution": "exponential", "meanMs": 2000 },
+            "dependsOn": ["list-products"],
+            "correlates": [
+              {
+                "sourceStepId": "list-products",
+                "extract": { "from": "body_json", "path": "products[0].id" },
+                "inject": { "into": "path_param", "as": "id" }
+              }
+            ]
+          }
+        ],
+        "baseline": { "p50Ms": 40, "p95Ms": 120, "p99Ms": 260, "errorRate": 0.002, "arrivalShare": 0.6 }
+      },
+      {
+        "id": "checkout",
+        "description": "Transactional checkout: view product, add to cart, place order",
+        "weight": 0.4,
+        "entrypoint": "POST /api/checkout",
+        "codeRef": "src/frontend/routes/checkout.ts#placeOrder",
+        "steps": [
+          {
+            "id": "view-product",
+            "service": "frontend-proxy",
+            "operation": "GET /api/products/{id}",
+            "callType": "http",
+            "codeRef": "src/frontend/routes/products.ts#getProduct",
+            "payloadRef": "productId"
+          },
+          {
+            "id": "add-to-cart",
+            "service": "frontend-proxy",
+            "operation": "POST /api/cart",
+            "callType": "http",
+            "codeRef": "src/frontend/routes/cart.ts#addItem",
+            "payloadRef": "cartItem",
+            "thinkTime": { "distribution": "uniform", "minMs": 500, "maxMs": 1500 },
+            "dependsOn": ["view-product"],
+            "correlates": [
+              {
+                "sourceStepId": "view-product",
+                "extract": { "from": "body_json", "path": "id" },
+                "inject": { "into": "body_field", "as": "productId" }
+              }
+            ]
+          },
+          {
+            "id": "place-order",
+            "service": "frontend-proxy",
+            "operation": "POST /api/checkout",
+            "callType": "http",
+            "codeRef": "src/frontend/routes/checkout.ts#placeOrder",
+            "payloadRef": "checkout",
+            "thinkTime": { "distribution": "constant", "meanMs": 3000 },
+            "dependsOn": ["add-to-cart"],
+            "correlates": [
+              {
+                "sourceStepId": "add-to-cart",
+                "extract": { "from": "body_json", "path": "cartId" },
+                "inject": { "into": "body_field", "as": "cartId" }
+              }
+            ]
+          }
+        ],
+        "baseline": { "p50Ms": 90, "p95Ms": 310, "p99Ms": 540, "errorRate": 0.004, "arrivalShare": 0.4 }
+      }
+    ],
+    "payloads": {
+      "productId": {
+        "fields": [
+          { "name": "id", "type": "string", "generator": "sequence", "distribution": "zipf" }
+        ],
+        "seed": 1337,
+        "cacheProfile": {
+          "targetHitRatio": 0.8,
+          "keyCardinality": 2000,
+          "backingStoreSeeded": true
+        }
+      },
+      "cartItem": {
+        "fields": [
+          { "name": "quantity", "type": "int", "generator": "random" }
+        ],
+        "seed": 42
+      },
+      "checkout": {
+        "fields": [
+          { "name": "email", "type": "string", "generator": "faker:email" },
+          { "name": "currency", "type": "enum", "values": ["USD", "EUR", "GBP"], "distribution": "weighted" }
+        ],
+        "seed": 7
+      }
+    },
+    "caps": { "maxRps": 150, "maxVus": 120, "maxDuration": "30m" },
+    "coverage": 0.86
+  },
+  "status": {
+    "revision": 3,
+    "hash": "sha256:deadbeefcafe",
+    "approval": {
+      "revision": 3,
+      "decision": "approved",
+      "decisionBy": "Henrik",
+      "decisionAt": "2026-10-09T09:00:00Z",
+      "confirmationRef": "confirmation:example:plan:00000000"
+    }
+  }
+}

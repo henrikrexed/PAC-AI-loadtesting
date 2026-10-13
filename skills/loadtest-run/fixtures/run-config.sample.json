@@ -1,0 +1,10 @@
+{
+  "modelRef": { "name": "checkout", "revision": 3, "hash": "sha256:deadbeef" },
+  "tool": "k6",
+  "target": { "baseUrl": "https://staging.internal", "environment": "staging", "allowlist": true },
+  "caps": { "maxRps": 400, "maxVus": 200, "maxDuration": "30m" },
+  "abort": { "errorRateGt": 0.05, "p95MsGt": 2500, "p99MsGt": 4000 },
+  "syntheticTag": { "baggage": "synthetic=true" },
+  "tolerances": { "arrivalWmape": 0.20, "p95Rel": 0.30, "edgePresence": 0.90, "errorDeltaPp": 1.0, "journeyTvd": 0.15 },
+  "telemetry": { "environment": "staging-dt-tenant", "timeframe": "-15m", "filter": "synthetic == true" }
+}

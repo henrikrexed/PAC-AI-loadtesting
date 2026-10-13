@@ -1,0 +1,372 @@
+{
+  "_comment": "SYNTHETIC example extraction for a fictional OpenTelemetry-demo-shaped storefront. Every number is invented for demonstration and testing of the workload-model pipeline; no value here was measured from any real system. Same schema as a live extraction (see SKILL.md DQL pack), so build_example.py and the test suite run unchanged.",
+  "environment": "example",
+  "timeframe": "-3h (synthetic example window: deploy-free / incident-free)",
+  "window_seconds": 10800,
+  "access_log_availability": "unavailable",
+  "access_log_probe": "fetch logs | filter k8s.container.name == 'istio-proxy' -> 0 lines (synthetic)",
+  "sampling_ratio": 1.0,
+  "front_end": {
+    "resolved": "frontend-proxy",
+    "resolved_op": "ingress",
+    "method": "earliest-start root span per trace + noise classifier + edge",
+    "ingress_crosscheck": "N/A - no istio-ingressgateway access logs in this example; edge server span.kind==server tiebreak used"
+  },
+  "journeys": [
+    {
+      "op": "user_browse_product",
+      "traces": 2450,
+      "svc_set": [
+        "frontend",
+        "load-generator",
+        "frontend-proxy",
+        "product-catalog"
+      ]
+    },
+    {
+      "op": "user_add_to_cart",
+      "traces": 1360,
+      "svc_set": [
+        "cart",
+        "frontend",
+        "load-generator",
+        "frontend-proxy",
+        "product-catalog"
+      ]
+    },
+    {
+      "op": "user_get_ads",
+      "traces": 730,
+      "svc_set": [
+        "frontend",
+        "load-generator",
+        "frontend-proxy",
+        "ad"
+      ]
+    },
+    {
+      "op": "user_get_recommendations",
+      "traces": 690,
+      "svc_set": [
+        "frontend",
+        "load-generator",
+        "frontend-proxy",
+        "recommendation",
+        "product-catalog"
+      ]
+    },
+    {
+      "op": "user_view_cart",
+      "traces": 675,
+      "svc_set": [
+        "cart",
+        "frontend",
+        "load-generator",
+        "frontend-proxy"
+      ]
+    },
+    {
+      "op": "user_get_product_reviews",
+      "traces": 520,
+      "svc_set": [
+        "frontend",
+        "load-generator",
+        "frontend-proxy",
+        "product-reviews"
+      ]
+    },
+    {
+      "op": "user_checkout_single",
+      "traces": 240,
+      "svc_set": [
+        "email",
+        "cart",
+        "currency",
+        "shipping",
+        "frontend",
+        "load-generator",
+        "quote",
+        "flagd",
+        "frontend-proxy",
+        "payment",
+        "product-catalog",
+        "checkout"
+      ]
+    },
+    {
+      "op": "user_checkout_multi",
+      "traces": 235,
+      "svc_set": [
+        "email",
+        "cart",
+        "currency",
+        "shipping",
+        "frontend",
+        "load-generator",
+        "quote",
+        "flagd",
+        "frontend-proxy",
+        "payment",
+        "product-catalog",
+        "checkout"
+      ]
+    },
+    {
+      "op": "user_index",
+      "traces": 210,
+      "svc_set": [
+        "frontend",
+        "load-generator",
+        "frontend-proxy"
+      ]
+    },
+    {
+      "op": "user_ask_product_ai_assistant",
+      "traces": 90,
+      "svc_set": [
+        "frontend",
+        "load-generator",
+        "frontend-proxy",
+        "product-reviews"
+      ]
+    }
+  ],
+  "per_minute_cov": {
+    "meanRpm": 40.0,
+    "sd": 4.6,
+    "cov": 0.115,
+    "minRpm": 28,
+    "maxRpm": 52,
+    "bins": 181
+  },
+  "server_baseline_frontend": {
+    "p50_ms": 3,
+    "p90_ms": 13,
+    "p95_ms": 16,
+    "p99_ms": 61,
+    "mean_ms": 2000,
+    "count": 18000,
+    "errs": 0
+  },
+  "server_rate_tps": 2.0,
+  "observed_concurrency": 3.8,
+  "product_keys": {
+    "distinct": 8,
+    "reads": 7550,
+    "access_counts": {
+      "SKU-0001": 1050,
+      "SKU-0002": 1010,
+      "SKU-0003": 985,
+      "SKU-0004": 960,
+      "SKU-0005": 940,
+      "SKU-0006": 905,
+      "SKU-0007": 870,
+      "SKU-0008": 830
+    }
+  },
+  "_journey_note": "Entry ops above are individual load-generator (locust) task names from the demo load generator.",
+  "order_split": {
+    "buyer_traces": 475,
+    "browser_traces": 6725,
+    "buyer_share": 0.066,
+    "browser_share": 0.934,
+    "signal": "trace reaches an order-terminal service (payment/checkout); detected structurally via ORDER_TERMINAL_PATTERNS"
+  },
+  "buyer_funnel_reconstructed": "synthetic checkout_multi trace (60 spans, reconstructed): frontend POST /api/checkout -> cart -> product-catalog xN -> currency -> shipping quote -> payment charge -> email -> cart empty",
+  "buyer_steps": [
+    {
+      "id": "s1",
+      "service": "frontend",
+      "operation": "GET /api/products/[productId]/index",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/products/[productId].ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 4,
+        "p99Ms": 6,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s2",
+      "service": "frontend",
+      "operation": "POST /api/cart",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/cart.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "dependsOn": [
+        "s1"
+      ],
+      "baseline": {
+        "p50Ms": 4,
+        "p95Ms": 6,
+        "p99Ms": 8,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s1",
+          "extract": {
+            "from": "body_json",
+            "path": "$.id"
+          },
+          "inject": {
+            "into": "body_field",
+            "as": "productId"
+          }
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "service": "frontend",
+      "operation": "GET /api/cart",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/cart.ts#handler",
+      "evidenceSource": "span",
+      "dependsOn": [
+        "s2"
+      ],
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 4,
+        "p99Ms": 5,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s2",
+          "extract": {
+            "from": "header",
+            "path": "set-cookie:session"
+          },
+          "inject": {
+            "into": "header",
+            "as": "cookie"
+          }
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "service": "frontend",
+      "operation": "POST /api/checkout",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/checkout.ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "checkout",
+      "dependsOn": [
+        "s2"
+      ],
+      "baseline": {
+        "p50Ms": 48000,
+        "p95Ms": 95000,
+        "p99Ms": 140000,
+        "errorRate": 0.0
+      },
+      "correlates": [
+        {
+          "sourceStepId": "s2",
+          "extract": {
+            "from": "header",
+            "path": "set-cookie:session"
+          },
+          "inject": {
+            "into": "header",
+            "as": "cookie"
+          }
+        }
+      ]
+    }
+  ],
+  "browser_steps": [
+    {
+      "id": "s1",
+      "service": "frontend",
+      "operation": "GET /",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/index.tsx#Home",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 5,
+        "p95Ms": 6,
+        "p99Ms": 8,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s2",
+      "service": "frontend",
+      "operation": "GET /api/products/[productId]/index",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/products/[productId].ts#handler",
+      "evidenceSource": "span",
+      "payloadRef": "product",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 4,
+        "p99Ms": 6,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s3",
+      "service": "frontend",
+      "operation": "GET /api/data",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/data.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 3,
+        "p95Ms": 5,
+        "p99Ms": 7,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s4",
+      "service": "frontend",
+      "operation": "GET /api/recommendations",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/recommendations.ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 9,
+        "p95Ms": 14,
+        "p99Ms": 21,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s5",
+      "service": "frontend",
+      "operation": "GET /api/product-reviews/[productId]/index",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/product-reviews/[productId].ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 6,
+        "p95Ms": 9,
+        "p99Ms": 13,
+        "errorRate": 0.0
+      }
+    },
+    {
+      "id": "s6",
+      "service": "frontend",
+      "operation": "POST /api/product-ask-ai-assistant/[productId]/index",
+      "callType": "http",
+      "codeRef": "src/frontend/pages/api/product-ask-ai-assistant/[productId].ts#handler",
+      "evidenceSource": "span",
+      "baseline": {
+        "p50Ms": 850,
+        "p95Ms": 1900,
+        "p99Ms": 3100,
+        "errorRate": 0.0
+      }
+    }
+  ]
+}

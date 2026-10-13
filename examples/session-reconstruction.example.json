@@ -1,0 +1,93 @@
+{
+  "_comment": "SYNTHETIC EXAMPLE — dual-source session reconstruction (RUM user.events + OTel span-stitch). ALL session ids are FAKE opaque uuids and ALL timings are representative, not extracted from any real tenant. Mirrors the shape produced by skills/workload-model rum_events.py + session_stitch.py + source_merge.py.",
+  "source": {
+    "tenant": "demo-tenant",
+    "app": "shop-frontend",
+    "object": "user.events + spans",
+    "windowHours": 24,
+    "sessions": 18500,
+    "scope": "storage:user.events:read (synthetic example — not a real grant)",
+    "rumSpanJoinKey": "dt.rum.session.id ⟗ trace.id / span.id on request events"
+  },
+  "rumSessionCoverage": {
+    "hasRumSignal": true,
+    "totalSessions": 20000,
+    "userEventsAccessible": true,
+    "apps": [
+      { "app": "shop-frontend", "type": "web", "sessions": 18500, "actionsP50": 6, "durationP50Seconds": 95, "bounceRate": 0.11 },
+      { "app": "shop-mobile", "type": "mobile", "sessions": 1500, "actionsP50": 4, "durationP50Seconds": 62, "bounceRate": 0.19 }
+    ]
+  },
+  "spanSessionCoverage": {
+    "hasSessionSignal": true,
+    "overallCoveragePct": 0.62,
+    "services": [
+      { "service": "shop-frontend", "totalSpans": 240000, "sessionSpans": 149000, "sessions": 18500, "coveragePct": 0.62, "meanActions": 6.1 }
+    ]
+  },
+  "sampleStitchedSessions": [
+    {
+      "sessionId": "00000000-rum-0000-0000-000000000001",
+      "source": "rum",
+      "actions": [
+        { "page": "/", "tStartMs": 0, "dwellMs": 1820 },
+        { "page": "/product/:id:", "tStartMs": 1820, "dwellMs": 1010 },
+        { "page": "/cart", "tStartMs": 2830, "dwellMs": 1460 },
+        { "page": "/", "tStartMs": 4290, "dwellMs": 1750 },
+        { "page": "/product/:id:", "tStartMs": 6040, "dwellMs": 980 },
+        { "page": "/cart", "tStartMs": 7020, "dwellMs": 1390 },
+        { "page": "/cart/checkout/:uuid:", "tStartMs": 8410, "dwellMs": 840 }
+      ]
+    },
+    {
+      "sessionId": "00000000-rum-0000-0000-000000000002",
+      "source": "rum",
+      "actions": [
+        { "page": "/", "tStartMs": 0, "dwellMs": 2410 },
+        { "page": "/product/:id:", "tStartMs": 2410, "dwellMs": 3620 },
+        { "page": "/cart", "tStartMs": 6030, "dwellMs": 1280 }
+      ]
+    },
+    {
+      "sessionId": "00000000-span-0000-0000-000000000099",
+      "source": "span",
+      "note": "no RUM match → reconstructed from OTel session.id on spans (tier 2a/2b fallback)",
+      "actions": [
+        { "operation": "GET /api/products/{productId}", "tStartMs": 0, "dwellMs": 900 },
+        { "operation": "POST /api/cart", "tStartMs": 900, "dwellMs": 1200 },
+        { "operation": "POST /api/checkout", "tStartMs": 2100, "dwellMs": 600 }
+      ]
+    }
+  ],
+  "journeyTemplates": [
+    { "sequence": ["/", "/product/:id:", "/cart", "/", "/product/:id:", "/cart", "/cart/checkout/:uuid:"], "sessions": 15355, "weight": 0.8300, "steps": 7 },
+    { "sequence": ["/", "/product/:id:", "/cart", "/", "/product/:id:", "/cart"], "sessions": 2442, "weight": 0.1320, "steps": 6 },
+    { "sequence": ["/", "/product/:id:", "/cart", "/", "/product/:id:"], "sessions": 407, "weight": 0.0220, "steps": 5 },
+    { "sequence": ["/", "/product/:id:", "/", "/cart", "/product/:id:", "/cart", "/cart/checkout/:uuid:"], "sessions": 167, "weight": 0.0090, "steps": 7 },
+    { "sequence": ["/", "/product/:id:"], "sessions": 74, "weight": 0.0040, "steps": 2 },
+    { "sequence": ["/"], "sessions": 55, "weight": 0.0030, "steps": 1 }
+  ],
+  "thinkTimeByPage": {
+    "/": { "n": 36000, "p50Ms": 1800.0, "p90Ms": 3900.0, "p99Ms": 12000.0, "meanMs": 2400.0, "maxMs": 31000.0 },
+    "/product/:id:": { "n": 36000, "p50Ms": 990.0, "p90Ms": 2350.0, "p99Ms": 5600.0, "meanMs": 3600.0, "maxMs": 65000.0 },
+    "/cart": { "n": 35500, "p50Ms": 1430.0, "p90Ms": 2830.0, "p99Ms": 6680.0, "meanMs": 1300.0, "maxMs": 22000.0 },
+    "/cart/checkout/:uuid:": { "n": 15200, "p50Ms": 830.0, "p90Ms": 990.0, "p99Ms": 1400.0, "meanMs": 3000.0, "maxMs": 4600.0 }
+  },
+  "perEndpointMerge": {
+    "entries": [
+      { "key": "/api/products/{productId}", "source": "rum", "rumRate": 2.4100, "spanRate": 2.6800, "extrapolationFactor": 1.1120, "rationale": "common: RUM user-session primary; scale RUM rate to the unsampled span-observed volume." },
+      { "key": "/api/cart", "source": "rum", "rumRate": 1.6080, "spanRate": 2.0660, "extrapolationFactor": 1.2848, "rationale": "common: RUM user-session primary; scale RUM rate to the unsampled span-observed volume." },
+      { "key": "/api/recommendations", "source": "rum", "rumRate": 1.8730, "spanRate": 2.0350, "extrapolationFactor": 1.0870, "rationale": "common: RUM user-session primary; scale RUM rate to the unsampled span-observed volume." },
+      { "key": "/api/checkout", "source": "span", "rumRate": null, "spanRate": 0.2500, "extrapolationFactor": null, "rationale": "no RUM match → span-order HTTP scenario (tiers 2a/2b)." }
+    ],
+    "summary": {
+      "keys": 4,
+      "rumPrimaryKeys": 3,
+      "spanFallbackKeys": 1,
+      "droppedRumOnlyKeys": 0,
+      "rumDrivenShare": 0.9340,
+      "meanExtrapolationFactor": 1.1613,
+      "extrapolationFactorRange": [1.0870, 1.2848]
+    }
+  }
+}

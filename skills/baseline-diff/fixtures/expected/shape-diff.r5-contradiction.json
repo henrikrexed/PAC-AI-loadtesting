@@ -1,0 +1,86 @@
+{
+  "run": "2026-10-09T13-00-00Z",
+  "baselineTimeframe": "2026-10-01T00:00Z/2026-10-08T00:00Z",
+  "scalingFactor": 0.25,
+  "samplingFactor": {
+    "prod": 1.0,
+    "test": 1.0
+  },
+  "syntheticProbeCount": 1801,
+  "dimensions": {
+    "arrivalShape": {
+      "metric": "wmape",
+      "value": 0.0064,
+      "tolerance": 0.2,
+      "scalingFactor": 0.25,
+      "alignedBins": 6,
+      "pass": true
+    },
+    "latency": {
+      "p50Rel": 0.0667,
+      "p95Rel": 0.1111,
+      "p99Rel": 0.1333,
+      "tolerances": {
+        "p50Rel": 0.25,
+        "p95Rel": 0.3,
+        "p99Rel": 0.35
+      },
+      "perJourney": {
+        "browse_product": {
+          "p50Rel": 0.0667,
+          "p95Rel": 0.1111,
+          "p99Rel": 0.1333
+        }
+      },
+      "pass": true
+    },
+    "serviceFanout": {
+      "edgePresence": 1.0,
+      "edgePresenceTolerance": 0.9,
+      "rateRatioRange": [
+        1.0,
+        1.04
+      ],
+      "rateRatioBand": [
+        0.5,
+        2.0
+      ],
+      "missingEdges": [],
+      "outOfBandEdges": [],
+      "pass": true
+    },
+    "errorRate": {
+      "deltaPp": 0.2,
+      "tolerancePp": 1.0,
+      "perJourney": {
+        "browse_product": 0.2
+      },
+      "pass": true
+    },
+    "journeyMix": {
+      "tvd": 0.01,
+      "tolerance": 0.15,
+      "pass": true
+    }
+  },
+  "r5CrossCheck": {
+    "metric": "dt.kubernetes.container.cpu_usage",
+    "source": "dynatrace-kubernetes-monitoring",
+    "plane": "infra (non-telemetry)",
+    "workload": "frontend",
+    "idleBaseline": 0.018,
+    "duringRun": 0.019,
+    "riseRatio": 1.056,
+    "minRiseRatio": 2.0,
+    "telemetryClaimsLoad": true,
+    "reason": "telemetry claims load but infra signal is flat \u2014 telemetry may be circular/misleading; do NOT accept",
+    "available": true,
+    "pass": false
+  },
+  "decision": "escalate",
+  "iteration": 1,
+  "failedDimensions": [],
+  "classifications": [],
+  "reason": "R5 infra cross-check FAILED \u2014 infra signal contradicts the telemetry load claim; escalate with diff + infra evidence",
+  "runTimeframe": "2026-10-09T12:45Z/2026-10-09T13:00Z"
+}

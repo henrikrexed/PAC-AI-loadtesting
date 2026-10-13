@@ -1,0 +1,137 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/henrikrexed/AI-Performance-Testing/schemas/shape-diff.schema.json",
+  "title": "ShapeDiff",
+  "description": "ANALYZE-stage output (methodology.md §3.5 / §5.4, gate V3). Extends the §5.4 template with the G4 cacheHitRatio dimension, the R5 infra cross-check block, and the R8 governance tolerance-drift flag.",
+  "type": "object",
+  "required": ["run", "baselineTimeframe", "scalingFactor", "samplingFactor", "syntheticProbeCount", "dimensions", "r5CrossCheck", "decision", "iteration"],
+  "additionalProperties": false,
+  "properties": {
+    "run": { "type": "string", "description": "run id / UTC timestamp of runs/<ts>/" },
+    "baselineTimeframe": { "type": "string", "description": "ISO interval of the production baseline window" },
+    "runTimeframe": { "type": "string", "description": "ISO interval of the synthetic run window" },
+    "scalingFactor": { "type": "number", "exclusiveMinimum": 0, "description": "test target RPS ÷ baseline RPS; baseline is divided by this before comparison (§3.5 prereq 3), never inferred silently" },
+    "samplingFactor": {
+      "type": "object",
+      "required": ["prod", "test"],
+      "properties": {
+        "prod": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "test": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 }
+      },
+      "description": "fraction of telemetry retained per dataset; rates are sampling-corrected before diff (§3.5 prereq 2)"
+    },
+    "syntheticProbeCount": { "type": "integer", "minimum": 0, "description": "count of synthetic==true spans in the warm-up probe; MUST be > 0 or the diff is meaningless (§3.5 prereq 1)" },
+    "dimensions": {
+      "type": "object",
+      "required": ["arrivalShape", "latency", "serviceFanout", "errorRate", "journeyMix"],
+      "additionalProperties": false,
+      "properties": {
+        "arrivalShape": {
+          "type": "object", "required": ["metric", "value", "tolerance", "pass"],
+          "properties": {
+            "metric": { "const": "wmape" },
+            "value": { "type": "number" }, "tolerance": { "type": "number" },
+            "scalingFactor": { "type": "number" }, "alignedBins": { "type": "integer" },
+            "pass": { "type": "boolean" }
+          }
+        },
+        "latency": {
+          "type": "object", "required": ["p50Rel", "p95Rel", "p99Rel", "pass"],
+          "properties": {
+            "p50Rel": { "type": "number" }, "p95Rel": { "type": "number" }, "p99Rel": { "type": "number" },
+            "tolerances": { "type": "object" },
+            "perJourney": { "type": "object" },
+            "pass": { "type": "boolean" }
+          }
+        },
+        "serviceFanout": {
+          "type": "object", "required": ["edgePresence", "pass"],
+          "properties": {
+            "edgePresence": { "type": "number" }, "edgePresenceTolerance": { "type": "number" },
+            "rateRatioRange": { "type": "array" }, "rateRatioBand": { "type": "array" },
+            "missingEdges": { "type": "array", "items": { "type": "string" } },
+            "outOfBandEdges": { "type": "array" },
+            "pass": { "type": "boolean" }
+          }
+        },
+        "errorRate": {
+          "type": "object", "required": ["deltaPp", "pass"],
+          "properties": {
+            "deltaPp": { "type": "number" }, "tolerancePp": { "type": "number" },
+            "perJourney": { "type": "object" },
+            "pass": { "type": "boolean" }
+          }
+        },
+        "journeyMix": {
+          "type": "object", "required": ["tvd", "pass"],
+          "properties": {
+            "tvd": { "type": "number" }, "tolerance": { "type": "number" },
+            "pass": { "type": "boolean" }
+          }
+        },
+        "cacheHitRatio": {
+          "type": "object", "required": ["maxDeltaAbs", "pass"],
+          "description": "G4 dimension — present only when a payload cacheProfile.targetHitRatio was set",
+          "properties": {
+            "maxDeltaAbs": { "type": "number" }, "tolerance": { "type": "number" },
+            "perEndpoint": { "type": "object" },
+            "pass": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "r5CrossCheck": {
+      "type": "object",
+      "required": ["available", "pass"],
+      "description": "§11 R5 non-telemetry cross-check against infra metrics (Dynatrace Kubernetes monitoring CPU / pod network). Not optional: available:false blocks a clean accept.",
+      "properties": {
+        "available": { "type": "boolean" },
+        "pass": { "type": "boolean" },
+        "metric": { "type": "string" },
+        "source": { "type": "string" },
+        "plane": { "type": "string" },
+        "workload": { "type": ["string", "null"] },
+        "idleBaseline": { "type": "number" }, "duringRun": { "type": "number" },
+        "riseRatio": { "type": "number" }, "minRiseRatio": { "type": "number" },
+        "telemetryClaimsLoad": { "type": "boolean" },
+        "reason": { "type": "string" }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "description": "§11 R8 — tolerance-drift / anti-gaming flags (informational, does not change the decision)",
+      "properties": {
+        "toleranceDrift": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["dimension", "default", "configured", "direction"],
+            "properties": {
+              "dimension": { "type": "string" },
+              "default": { "type": "number" }, "configured": { "type": "number" },
+              "direction": { "const": "looser" }
+            }
+          }
+        }
+      }
+    },
+    "decision": { "enum": ["accept", "iterate", "escalate"] },
+    "iteration": { "type": "integer", "minimum": 1 },
+    "failedDimensions": { "type": "array", "items": { "type": "string" } },
+    "classifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["dimension", "classification", "structural", "suggestedAction"],
+        "properties": {
+          "dimension": { "type": "string" },
+          "classification": { "enum": ["shape", "latency", "fan-out", "error", "mix", "cache", "unknown"] },
+          "structural": { "type": "boolean" },
+          "suggestedAction": { "type": "string" }
+        }
+      }
+    },
+    "reason": { "type": "string" },
+    "caveats": { "type": "array", "items": { "type": "string" } }
+  }
+}

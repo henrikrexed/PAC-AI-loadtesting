@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: crewai-deepseek-agent
+  namespace: agentapp
+  labels: { app: crewai-deepseek-agent }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: crewai-deepseek-agent } }
+  template:
+    metadata:
+      labels: { app: crewai-deepseek-agent }
+      annotations: { sidecar.istio.io/inject: "false" }
+    spec:
+      containers:
+        - name: agent
+          # Replace with the pushed image ref (see component README §Build & push).
+          # Must be reachable by the cluster.
+          image: REGISTRY/crewai-deepseek-agent:0.1.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - { containerPort: 8080, name: http }
+          env:
+            - { name: OTEL_SERVICE_NAME, value: "crewai-deepseek-agent" }
+            - { name: OTEL_SERVICE_NAMESPACE, value: "agentapp" }
+            - { name: OTEL_EXPORTER_OTLP_ENDPOINT, value: "http://agent-collector.agentapp.svc.cluster.local:4318" }
+            - { name: DEEPSEEK_MODEL, value: "deepseek/deepseek-chat" }
+            - { name: DEEPSEEK_BASE_URL, value: "https://api.deepseek.com" }
+            - name: DEEPSEEK_API_KEY
+              valueFrom: { secretKeyRef: { name: deepseek-api, key: apiKey } }
+          readinessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /healthz, port: 8080 }
+            initialDelaySeconds: 10
+            periodSeconds: 20
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits:   { cpu: 500m, memory: 512Mi }

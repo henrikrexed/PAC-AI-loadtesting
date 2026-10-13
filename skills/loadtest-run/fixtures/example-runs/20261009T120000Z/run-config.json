@@ -1,0 +1,38 @@
+{
+  "abort": {
+    "errorRateGt": 0.05,
+    "p95MsGt": 2500,
+    "p99MsGt": 4000
+  },
+  "caps": {
+    "maxDuration": "30m",
+    "maxRps": 400,
+    "maxVus": 200
+  },
+  "modelRef": {
+    "hash": "sha256:deadbeef",
+    "name": "checkout",
+    "revision": 3
+  },
+  "syntheticTag": {
+    "baggage": "synthetic=true"
+  },
+  "target": {
+    "allowlist": true,
+    "baseUrl": "https://staging.internal",
+    "environment": "staging"
+  },
+  "telemetry": {
+    "environment": "staging-dt-tenant",
+    "filter": "synthetic == true",
+    "timeframe": "-15m"
+  },
+  "tolerances": {
+    "arrivalWmape": 0.2,
+    "edgePresence": 0.9,
+    "errorDeltaPp": 1.0,
+    "journeyTvd": 0.15,
+    "p95Rel": 0.3
+  },
+  "tool": "k6"
+}

@@ -1,0 +1,20 @@
+[
+  { "turn_type": "tool", "prompt": "What is 3 * (47 + 19)? Show the result." },
+  { "turn_type": "tool", "prompt": "Search for the latest on OpenTelemetry gen_ai semantic conventions and summarize." },
+  { "turn_type": "tool", "prompt": "Look up what Kubernetes HorizontalPodAutoscaler does and give a one-line summary." },
+  { "turn_type": "tool", "prompt": "Compute (1024 / 8) + 256 and explain the result briefly." },
+  { "turn_type": "tool", "prompt": "Find recent discussion about DeepSeek model pricing and summarize the key point." },
+  { "turn_type": "tool", "prompt": "What is 15% of 2480? Use the calculator." },
+  { "turn_type": "tool", "prompt": "Search for the definition of the ReAct agent pattern and summarize it." },
+  { "turn_type": "tool", "prompt": "Compute 987 * 123 and report the product." },
+  { "turn_type": "chat", "prompt": "In one sentence, what is observability?" },
+  { "turn_type": "chat", "prompt": "Explain the difference between a trace and a span briefly." },
+  { "turn_type": "chat", "prompt": "What is a load test? Answer in two sentences." },
+  { "turn_type": "chat", "prompt": "Give a short definition of the coefficient of variation." },
+  { "turn_type": "chat", "prompt": "What does 'open-model arrival' mean in load testing? Keep it brief." },
+  { "turn_type": "chat", "prompt": "Summarize what a service mesh does in one sentence." },
+  { "turn_type": "chat", "prompt": "What is Little's Law? One sentence." },
+  { "turn_type": "chat", "prompt": "Briefly, what is a Kubernetes namespace?" },
+  { "turn_type": "chat", "prompt": "What is the purpose of a readiness probe? One sentence." },
+  { "turn_type": "chat", "prompt": "Define 'p95 latency' in one sentence." }
+]
