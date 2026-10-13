@@ -14,7 +14,9 @@ Palette rationale (taste-skill compliant):
   - ONE ambient/structural accent = Matrix GREEN (telemetry / the real world / the signal).
   - The red/blue pill pair is a *semantic* duality used only where guess-vs-truth is the point
     (RED = observed truth / the human gate ; BLUE = guessing / synthetic / folklore).
-  - AMBER is reserved for honesty beats: dashed "unavailable" / "403 glitch" edges & caveats.
+  - AMBER is reserved for honesty beats: the dashed "unavailable" edge (the empty logs leg
+    on this tenant) & caveats. (Note: user.events is NOT amber — the scope was granted, so it
+    renders as a solid live feed; see ISI-5719/ISI-5726.)
   - Neutral near-black base (faint green cast), single corner-radius scale, hairline borders.
 """
 import os, math, random
@@ -39,7 +41,7 @@ RED   = (255, 77, 94)     # red pill = observed truth / the human gate
 RED_DIM=(120, 40, 50)
 BLUE  = (92, 141, 239)    # blue pill = guessing / synthetic / folklore
 BLUE_DIM=(48, 70, 120)
-AMBER = (246, 178, 60)    # caution / dashed-unavailable / 403 glitch
+AMBER = (246, 178, 60)    # caution / dashed-unavailable edge (empty logs leg)
 AMBER_DIM=(120, 88, 32)
 
 INK   = (234, 243, 236)   # primary text
@@ -244,7 +246,7 @@ def lock(draw, center, size=34, color=RED, locked=True):
     draw.ellipse([cx - 4, cy + 2, cx + 4, cy + 10], fill=BG0)
 
 def badge(draw, xy, label, fnt, fg=AMBER, bg=None, pad=(14, 7)):
-    """small status pill badge e.g. '403 · scope-gated'."""
+    """small status pill badge e.g. 'LIVE · 16 journeys' (green) or 'logs · unavailable' (amber)."""
     w, h = measure(draw, label, fnt)
     x, y = xy
     box = [x, y, x + w + pad[0]*2, y + h + pad[1]*2]
