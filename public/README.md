@@ -11,10 +11,10 @@ benchmarking projects.
 
 ## The loop
 
-```
-SCOPE ──G0──▶ VALIDATE ──V1──▶ SYNTHESIZE ──V2a──▶ EXECUTE ──V2b──▶ ANALYZE ──V3──┐
-  ▲                                                                              │
-  └──────────────── iterate (parameter-only, ≤3×) or escalate ◀───────────────────┘
+```mermaid
+flowchart LR
+    SCOPE -->|G0| VALIDATE -->|V1| SYNTHESIZE -->|V2a| EXECUTE -->|V2b| ANALYZE
+    ANALYZE -->|"V3 — iterate (parameter-only, ≤3×) or escalate"| SCOPE
 ```
 
 | Stage | What happens | Who owns it |
@@ -36,24 +36,6 @@ Why it is built this way:
 - **AI does the legwork, not the deciding** — the skills are written for coding agents
   (Claude Code, opencode, Cursor, …); every consequential decision stays with a human
   or a deterministic gate.
-
-## Repository layout
-
-```
-skills/          agent-ready skill definitions (SKILL.md + deterministic scripts + tests)
-  workload-model/    SCOPE — telemetry → G0-validated workload model + proposal (the engine)
-  k6-synthesis/      SYNTHESIZE — approved model → k6 code + payload pools (V2a)
-  loadtest-run/      EXECUTE — smoke gate, caps/abort supervisor, run reports (V2b)
-  baseline-diff/     ANALYZE — shape-diff vs baseline, R5 cross-check (V3)
-  rum-sessions/      RUM user-session shape & coverage (Dynatrace Grail)
-  session-stitch/    session reconstruction from OTel session.id on spans
-utilities/       standalone CLIs: rum_sessions.py, session_stitch.py (no telemetry I/O)
-docs/            methodology, usage, engine, requirements, skills-install
-tutorial/        end-to-end walkthrough incl. a deployable demo AI-agent component
-  otel-demo/         the baggage-promotion + OTLP-export collector the loop needs
-examples/        sanitized, 100% synthetic example artifacts
-tools/           secret-scan.sh (run before publishing anything)
-```
 
 ## Documentation
 

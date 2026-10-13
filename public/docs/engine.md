@@ -140,13 +140,21 @@ The engine owns **SCOPE**. It is one stop in the methodology's
 [`methodology.md`](methodology.md)). The engine's job is to produce a model that a human
 can approve.
 
-```
-          ┌──────────── you / your coding agent ────────────┐   ┌─ human ─┐
-telemetry │ (adapter)         SCOPE                          │   │ VALIDATE│
-  ───────▶│ dtctl/DQL ─▶ extract.json ─▶ workload-engine ─▶  │   │   V1    │
-          │                              workload-model.json │──▶│ approve │──▶ SYNTHESIZE ─▶ EXECUTE ─▶ ANALYZE
-          │                              scenario-proposal.md│   │ (gate)  │     (renderer)   (loadtest-run) (baseline-diff)
-          └───────────────────────────────────────────────┘   └─────────┘
+```mermaid
+flowchart LR
+    T[telemetry] --> A
+    subgraph agent["you / your coding agent — SCOPE"]
+        direction LR
+        A["adapter: dtctl / DQL"] --> E[extract.json] --> W[workload-engine]
+        W --> M[workload-model.json]
+        W --> P[scenario-proposal.md]
+    end
+    subgraph human["human — VALIDATE / V1"]
+        G["approve (gate)"]
+    end
+    M --> G
+    P --> G
+    G --> S["SYNTHESIZE<br/>(renderer)"] --> X["EXECUTE<br/>(loadtest-run)"] --> N["ANALYZE<br/>(baseline-diff)"]
 ```
 
 ### Step 1 — produce a neutral extract (adapter, outside the engine)

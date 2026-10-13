@@ -37,10 +37,10 @@ of it; the gates and principles below are what matter even if you swap tools.
 
 ## 2. The loop
 
-```
-SCOPE ──G0──▶ VALIDATE ──V1──▶ SYNTHESIZE ──V2a──▶ EXECUTE ──V2b──▶ ANALYZE ──V3──┐
-  ▲                                                                              │
-  └──────────────── iterate (parameter-only, ≤3×) or escalate ◀───────────────────┘
+```mermaid
+flowchart LR
+    SCOPE -->|G0| VALIDATE -->|V1| SYNTHESIZE -->|V2a| EXECUTE -->|V2b| ANALYZE
+    ANALYZE -->|"V3 — iterate (parameter-only, ≤3×) or escalate"| SCOPE
 ```
 
 | Stage | Owner | Input → Output | Gate |

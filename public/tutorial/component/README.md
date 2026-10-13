@@ -4,13 +4,13 @@ A small, self-contained **AI agent service** for practicing the AI-Performance-T
 loop. One endpoint (`POST /request`) runs a single agent turn and emits a deterministic
 OpenTelemetry span tree:
 
-```
-crewai-deepseek-agent/request        <- single root span (the entry point)
-  └─ agent.turn
-       ├─ llm.call ─ chat            (gen_ai semconv: system, model, usage)
-       ├─ execute_tool  xN           <- only on tool-using turns
-       ├─ finalize
-       └─ message.sent
+```mermaid
+flowchart TD
+    R["crewai-deepseek-agent/request<br/>(single root span — the entry point)"] --> T[agent.turn]
+    T --> L["llm.call — chat<br/>(gen_ai semconv: system, model, usage)"]
+    T --> X["execute_tool ×N<br/>(only on tool-using turns)"]
+    T --> F[finalize]
+    T --> M[message.sent]
 ```
 
 Two deterministic turn types, which the SCOPE stage will rediscover as two behavioral
