@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="512" height="512" role="img" aria-label="Knightload — Signal Diamond">
+  <title>Knightload — Signal Diamond</title>
+  <defs>
+    <radialGradient id="glowD" cx="50%" cy="46%" r="62%">
+      <stop offset="0%" stop-color="#2EE6D6"/>
+      <stop offset="100%" stop-color="#16213E"/>
+    </radialGradient>
+  </defs>
+  <polygon points="500,40 900,500 500,960 100,500" fill="url(#glowD)" stroke="#2EE6D6" stroke-width="18" stroke-linejoin="round"/>
+  <rect x="318.5" y="296.5" width="71.5" height="407.0" rx="16.5" fill="#1A1A2E"/><polygon points="390.0,511.0 621.0,703.5 692.5,703.5 461.5,494.5" fill="#1A1A2E" /><polygon points="390.0,472.5 698.0,274.5 555.0,373.5 450.5,527.5" fill="#1A1A2E" />
+</svg>
