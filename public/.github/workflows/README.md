@@ -1,12 +1,13 @@
-# CI/CD workflows — design (ISI-5758)
+# CI/CD workflows
 
-Two pipelines publish the **workload-model engine** as GitHub artifacts, per the
-board's ask (binaries + container image). ISI-5743 owns this *design*; ISI-5735 owns
-*execution* against the public remote. The split below is deliberate so there is exactly
-one place that pushes to GHCR (no duplicate/competing pipelines).
+Three pipelines gate and publish the **workload-model engine**: a secret-scan gate on
+every push/PR, cross-platform binaries on release tags, and a multi-arch container image.
+The split below is deliberate so there is exactly one place that pushes to GHCR (no
+duplicate/competing pipelines).
 
 | Workflow | Trigger | Produces |
 |---|---|---|
+| [`secret-scan.yml`](secret-scan.yml) | every push / PR (or manual) | fail-closed pre-publish gate — fails on any token, tenant URL, private IP, credential, or internal identifier (backed by `tools/secret-scan.sh`). **Publishes nothing.** |
 | [`release.yml`](release.yml) | tag `v*` (or manual) | 5 PyInstaller binaries (`linux-amd64/arm64`, `darwin-amd64/arm64`, `windows-amd64`), each with a CycloneDX SBOM, attached to a generated GitHub Release. **Builds no image.** |
 | [`docker.yml`](docker.yml) | PR → build+Trivy (no push); `main` → `edge`/`main-<sha>`; tag `v*` → `{version}`,`{major}.{minor}`,`latest` + Trivy + SBOM | multi-arch (amd64+arm64) image → `ghcr.io/henrikrexed/ai-performance-testing`. **The only pipeline that pushes to GHCR.** |
 
@@ -33,10 +34,10 @@ contract is fixed by [`docs/engine.md`](../../docs/engine.md):
 
 ## ⚠️ Precondition / open coordination item
 
-As of this design, the `engine/` package **does not yet exist in the repo** — it is
-*specified* by `docs/engine.md` but not implemented, and `examples/crewai-deepseek-agent/extract.json`
-is likewise absent. **Both workflows will fail at build time until the engine package and
-its smoke fixture are committed.** Implementing `engine/` (cli.py + the stdlib modules
-`emit/g0_gate/shaping/archetypes/clustering/source_merge` + `schema.json` + tests + a
-sample extract) is engine-packaging work owned by **ISI-5735**. These workflows are
-ready to go green the moment that package lands.
+The `release.yml` and `docker.yml` pipelines bundle an `engine/` package that is
+*specified* by `docs/engine.md`. **Both will fail at build time until the engine package
+and its smoke fixture (`examples/crewai-deepseek-agent/extract.json`) are committed** —
+`engine/cli.py` plus the stdlib modules
+(`emit`/`g0_gate`/`shaping`/`archetypes`/`clustering`/`source_merge`), `schema.json`,
+tests, and a sample extract. The `secret-scan.yml` gate has no such dependency and runs
+on day one; the build pipelines go green the moment the engine package lands.

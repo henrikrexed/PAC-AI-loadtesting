@@ -1,12 +1,12 @@
 # Secret-scrub & genericization report — Phase 6a
 
 Scope: everything under `/skills` and `/utilities` in this tree, derived from an internal
-PAC toolkit workspace. Goal: standalone, parameterized, zero-secret skills/utilities safe
+toolkit workspace. Goal: standalone, parameterized, zero-secret skills/utilities safe
 for a public repo. Re-verify anytime with `bash tools/secret-scan.sh`.
 
 ## 1. Automated scan
 
-`tools/secret-scan.sh` checks the whole tree for:
+`tools/secret-scan.sh` checks the shippable tree for:
 
 - Dynatrace token formats (`dt0c01…`, `dt0s01…`, `dt0a01…` and long bearer blobs)
 - tenant/environment URLs (`https://<env>.live|dev.dynatrace.com`; the
@@ -15,9 +15,22 @@ for a public repo. Re-verify anytime with `bash tools/secret-scan.sh`.
 - credential-looking assignments (`token|secret|password|apikey = <16+ chars>`)
 - known internal-namespace identifiers from the source workspace (list maintained in
   the scanner; deliberately not spelled out here)
+- internal issue-tracker ids (ticket-id pattern)
+- the internal platform name
+- internal project-name variants (anchored so generic words like `namespace` do not
+  false-positive)
 
-**Result: PASS** (initial run 2026-10-12). Excludes generated dirs (`out/`, `runs/`,
-`node_modules/`, caches) which are gitignored.
+The gate **fails closed** (exit 1 on any hit) and is wired as CI via
+`.github/workflows/secret-scan.yml`, so any PR/commit that reintroduces a hit fails.
+It scans exactly the tree that ships: generated dirs (`out/`, `runs/`, caches) and the
+internal-only files the publish pipeline never ships (the local publish-courier, this
+report, and the internal publish tool) are excluded, kept in lockstep with
+`tools/publish-fresh-history.sh`.
+
+**Result: PASS** (hardened run 2026-10-13). During hardening the gate surfaced and
+scrubbed residual internal refs from shippable files: two schema `$id` URLs and a field
+description, a stale auto-gen header in a k6 example, and issue-id stamps in the
+`.github/workflows` comments — all genericized.
 
 ## 2. What was scrubbed (manual review inventory)
 

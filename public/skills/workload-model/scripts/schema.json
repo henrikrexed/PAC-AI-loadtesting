@@ -1,6 +1,6 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "https://github.com/henrikrexed/PAC-AI-loadtesting/schemas/workload-model.schema.json",
+  "$id": "https://github.com/henrikrexed/AI-Performance-Testing/schemas/workload-model.schema.json",
   "title": "WorkloadModel",
   "type": "object",
   "required": ["apiVersion", "kind", "metadata", "spec", "status"],
@@ -227,7 +227,7 @@
             "decision": { "enum": ["approved", "adjusted"] },
             "decisionBy": { "type": "string" },
             "decisionAt": { "type": "string", "format": "date-time" },
-            "confirmationRef": { "type": "string", "description": "Paperclip interaction/approval id" }
+            "confirmationRef": { "type": "string", "description": "approval/confirmation reference id" }
           }
         }
       }
