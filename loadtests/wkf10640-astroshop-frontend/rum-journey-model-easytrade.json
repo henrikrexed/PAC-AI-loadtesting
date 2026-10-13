@@ -1,0 +1,657 @@
+{
+  "source": {
+    "tenant": "wkf10640",
+    "app": "EasyTrade",
+    "object": "user.events",
+    "windowHours": 24,
+    "sessions": 15351,
+    "spanNamespace": "easytrade",
+    "scope": "storage:user.events:read (granted 2026-10-13)",
+    "note": "trading app \u2014 a wholly different app from Astroshop"
+  },
+  "journeyTemplates": [
+    {
+      "sequence": [
+        "/login"
+      ],
+      "sessions": 7265,
+      "weight": 0.4733,
+      "steps": 1
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/deposit",
+        "/instruments",
+        "/instruments/:id:",
+        "/credit-card",
+        "/credit-card/active"
+      ],
+      "sessions": 3622,
+      "weight": 0.2359,
+      "steps": 8
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:",
+        "/credit-card",
+        "/credit-card/active"
+      ],
+      "sessions": 2979,
+      "weight": 0.1941,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:",
+        "/withdraw",
+        "/credit-card",
+        "/credit-card/active"
+      ],
+      "sessions": 521,
+      "weight": 0.0339,
+      "steps": 8
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:"
+      ],
+      "sessions": 470,
+      "weight": 0.0306,
+      "steps": 5
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/deposit",
+        "/instruments",
+        "/instruments/:id:"
+      ],
+      "sessions": 345,
+      "weight": 0.0225,
+      "steps": 6
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/deposit",
+        "/instruments",
+        "/instruments/:id:",
+        "/credit-card",
+        "/credit-card/status"
+      ],
+      "sessions": 58,
+      "weight": 0.0038,
+      "steps": 8
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:",
+        "/credit-card",
+        "/credit-card/status"
+      ],
+      "sessions": 41,
+      "weight": 0.0027,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/credit-card",
+        "/credit-card/active",
+        "/credit-card/order",
+        "/credit-card/status"
+      ],
+      "sessions": 24,
+      "weight": 0.0016,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:",
+        "/withdraw",
+        "/credit-card",
+        "/credit-card/status"
+      ],
+      "sessions": 9,
+      "weight": 0.0006,
+      "steps": 8
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:",
+        "/withdraw",
+        "/credit-card/active",
+        "/credit-card"
+      ],
+      "sessions": 8,
+      "weight": 0.0005,
+      "steps": 8
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/deposit",
+        "/instruments"
+      ],
+      "sessions": 3,
+      "weight": 0.0002,
+      "steps": 5
+    },
+    {
+      "sequence": [
+        "/credit-card",
+        "/credit-card/active"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 2
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 4
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 3
+    },
+    {
+      "sequence": [
+        "/instruments",
+        "/instruments/:id:",
+        "/credit-card",
+        "/credit-card/active"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 4
+    },
+    {
+      "sequence": [
+        "/",
+        "/login",
+        "/home",
+        "/instruments",
+        "/instruments/:id:",
+        "/credit-card",
+        "/credit-card/order"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/credit-card/active"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 1
+    }
+  ],
+  "thinkTimeByPage": {
+    "/login": {
+      "n": 15346,
+      "p50Ms": 1545.6,
+      "p90Ms": 1685.7,
+      "p99Ms": 2804.6,
+      "meanMs": 1566.1,
+      "maxMs": 4366.0
+    },
+    "/": {
+      "n": 8083,
+      "p50Ms": 783.0,
+      "p90Ms": 996.2,
+      "p99Ms": 1212.2,
+      "meanMs": 786.5,
+      "maxMs": 1605.0
+    },
+    "/home": {
+      "n": 8082,
+      "p50Ms": 1634.9,
+      "p90Ms": 1867.4,
+      "p99Ms": 2102.9,
+      "meanMs": 1629.1,
+      "maxMs": 2389.0
+    },
+    "/instruments": {
+      "n": 8058,
+      "p50Ms": 1772.6,
+      "p90Ms": 2062.1,
+      "p99Ms": 2249.1,
+      "meanMs": 1827.9,
+      "maxMs": 31805.0
+    },
+    "/instruments/:id:": {
+      "n": 8053,
+      "p50Ms": 5590.8,
+      "p90Ms": 37610.3,
+      "p99Ms": 37610.3,
+      "meanMs": 11038.3,
+      "maxMs": 42306.0
+    },
+    "/credit-card": {
+      "n": 7264,
+      "p50Ms": 1401.9,
+      "p90Ms": 1980.8,
+      "p99Ms": 3328.5,
+      "meanMs": 1433.7,
+      "maxMs": 4492.0
+    },
+    "/credit-card/active": {
+      "n": 7155,
+      "p50Ms": 1008.8,
+      "p90Ms": 1402.3,
+      "p99Ms": 2424.4,
+      "meanMs": 1109.1,
+      "maxMs": 2789.0
+    },
+    "/deposit": {
+      "n": 4028,
+      "p50Ms": 13297.2,
+      "p90Ms": 13297.2,
+      "p99Ms": 13297.2,
+      "meanMs": 14787.0,
+      "maxMs": 16803.0
+    },
+    "/withdraw": {
+      "n": 538,
+      "p50Ms": 11181.6,
+      "p90Ms": 13297.2,
+      "p99Ms": 13297.2,
+      "meanMs": 14045.6,
+      "maxMs": 15631.0
+    },
+    "/credit-card/status": {
+      "n": 132,
+      "p50Ms": 875.0,
+      "p90Ms": 1209.0,
+      "p99Ms": 2317.0,
+      "meanMs": 947.8,
+      "maxMs": 2332.0
+    },
+    "/credit-card/order": {
+      "n": 25,
+      "p50Ms": 9222.0,
+      "p90Ms": 9703.0,
+      "p99Ms": 9918.0,
+      "meanMs": 8790.2,
+      "maxMs": 9918.0
+    }
+  },
+  "perEndpointMerge": {
+    "entries": [
+      {
+        "key": "/v1/flags/ergo_aggregator_slowdown",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 1.665509,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/Packages/GetPackages",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 1.664178,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/Products/GetProducts",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 1.664178,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/offers/CryptoTrading.com",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.333113,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/offers/tradeCom.co.uk",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.333113,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/offers/Stratton-oakmount.com",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.333102,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/offers/CheapTrading.mi",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.33309,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/offers/dynatestsieger.at",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.33309,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/flags/high_cpu_usage",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.184919,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/prices/latest",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.139525,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/broker-service/v1/instrument",
+        "source": "rum",
+        "rumRate": 0.116713,
+        "spanRate": 0.123113,
+        "extrapolationFactor": 1.0548,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0548 to the unsampled span-observed volume (0.123113/s)."
+      },
+      {
+        "key": "/v1/instrument",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.123021,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/prices/instrument/:id:",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.122674,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/flags",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.103796,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/feature-flag-service/v1/flags",
+        "source": "rum",
+        "rumRate": 0.093553,
+        "spanRate": 0.103773,
+        "extrapolationFactor": 1.1092,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.1092 to the unsampled span-observed volume (0.103773/s)."
+      },
+      {
+        "key": "/accountservice/api/accounts/presets",
+        "source": "rum",
+        "rumRate": 0.093553,
+        "spanRate": 0.097442,
+        "extrapolationFactor": 1.0416,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0416 to the unsampled span-observed volume (0.097442/s)."
+      },
+      {
+        "key": "/api/accounts/presets",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.097442,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/Accounts/",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.09735,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/Login",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.093507,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/loginservice/api/Login",
+        "source": "rum",
+        "rumRate": 0.093542,
+        "spanRate": 0.093507,
+        "extrapolationFactor": 0.9996,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d70.9996 to the unsampled span-observed volume (0.093507/s)."
+      },
+      {
+        "key": "/v1/flags/credit_card_meltdown",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.084618,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/Logout",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.084051,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/loginservice/api/Logout",
+        "source": "rum",
+        "rumRate": 0.084062,
+        "spanRate": 0.084051,
+        "extrapolationFactor": 0.9999,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d70.9999 to the unsampled span-observed volume (0.084051/s)."
+      },
+      {
+        "key": "/api/trade/scheduler/notification",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.069595,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/broker-service/v1/trade/long/sell",
+        "source": "rum",
+        "rumRate": 0.034954,
+        "spanRate": 0.034954,
+        "extrapolationFactor": 1.0,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0 to the unsampled span-observed volume (0.034954/s)."
+      },
+      {
+        "key": "/broker-service/v1/trade/long/buy",
+        "source": "rum",
+        "rumRate": 0.034931,
+        "spanRate": 0.034931,
+        "extrapolationFactor": 1.0,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0 to the unsampled span-observed volume (0.034931/s)."
+      },
+      {
+        "key": "/v1/trade/long/sell",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.034931,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/trade/long/buy",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.034896,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/pricing-service/v1/prices/instrument/:id:",
+        "source": "rum",
+        "rumRate": 0.093206,
+        "spanRate": 0.034826,
+        "extrapolationFactor": 0.3736,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d70.3736 to the unsampled span-observed volume (0.034826/s)."
+      },
+      {
+        "key": "/v1/flags/credit_card_validation",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.020324,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/trade/long/process",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.016644,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/broker-service/v1/trade/buy",
+        "source": "rum",
+        "rumRate": 0.011667,
+        "spanRate": 0.015868,
+        "extrapolationFactor": 1.3601,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.3601 to the unsampled span-observed volume (0.015868/s)."
+      },
+      {
+        "key": "/v1/trade/buy",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.015856,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/v1/flags/db_not_responding",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.014572,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/broker-service/v1/trade/sell",
+        "source": "rum",
+        "rumRate": 0.011655,
+        "spanRate": 0.011655,
+        "extrapolationFactor": 1.0,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0 to the unsampled span-observed volume (0.011655/s)."
+      },
+      {
+        "key": "/v1/trade/sell",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.011655,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/broker-service/v1/balance/:id:",
+        "source": "rum",
+        "rumRate": 0.062604,
+        "spanRate": 0.008137,
+        "extrapolationFactor": 0.13,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d70.13 to the unsampled span-observed volume (0.008137/s)."
+      },
+      {
+        "key": "/v1/balance/:id:",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.008125,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/login/",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.006968,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      }
+    ],
+    "summary": {
+      "keys": 39,
+      "rumPrimaryKeys": 11,
+      "spanFallbackKeys": 28,
+      "droppedRumOnlyKeys": 0,
+      "rumDrivenShare": 0.0741,
+      "meanExtrapolationFactor": 0.9153,
+      "extrapolationFactorRange": [
+        0.13,
+        1.3601
+      ]
+    }
+  }
+}

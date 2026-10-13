@@ -5,8 +5,9 @@
     "object": "user.events",
     "windowHours": 24,
     "sessions": 18773,
+    "spanNamespace": "astroshop",
     "scope": "storage:user.events:read (granted 2026-10-13)",
-    "rumSpanJoinKey": "trace.id / span.id present on request events"
+    "note": "otel-demo e-commerce"
   },
   "journeyTemplates": [
     {
@@ -234,96 +235,128 @@
   "perEndpointMerge": {
     "entries": [
       {
-        "key": "/api/images/:file:",
-        "source": "rum",
-        "rumRate": 11.090405,
-        "spanRate": 11.736933,
-        "extrapolationFactor": 1.0583,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0583 to the unsampled span-observed volume (11.7369/s)."
-      },
-      {
-        "key": "/api/cart",
-        "source": "rum",
-        "rumRate": 1.608368,
-        "spanRate": 2.066412,
-        "extrapolationFactor": 1.2848,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.2848 to the unsampled span-observed volume (2.06641/s)."
-      },
-      {
-        "key": "/api/recommendations",
-        "source": "rum",
-        "rumRate": 1.872627,
-        "spanRate": 2.035463,
-        "extrapolationFactor": 1.087,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.087 to the unsampled span-observed volume (2.03546/s)."
-      },
-      {
-        "key": "/api/data",
-        "source": "rum",
-        "rumRate": 1.314688,
-        "spanRate": 1.445799,
-        "extrapolationFactor": 1.0997,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0997 to the unsampled span-observed volume (1.4458/s)."
-      },
-      {
-        "key": "/api/shipping",
-        "source": "rum",
-        "rumRate": 0.740648,
-        "spanRate": 0.781273,
-        "extrapolationFactor": 1.0549,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0549 to the unsampled span-observed volume (0.781273/s)."
-      },
-      {
-        "key": "/api/products",
-        "source": "rum",
-        "rumRate": 0.651019,
-        "spanRate": 0.742905,
-        "extrapolationFactor": 1.1411,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.1411 to the unsampled span-observed volume (0.742905/s)."
-      },
-      {
-        "key": "/api/products/:id:",
-        "source": "rum",
-        "rumRate": 2.521377,
-        "spanRate": 0.510532,
-        "extrapolationFactor": 0.2025,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d70.2025 to the unsampled span-observed volume (0.510532/s)."
-      },
-      {
-        "key": "/api/currency",
-        "source": "rum",
-        "rumRate": 0.217083,
-        "spanRate": 0.409086,
-        "extrapolationFactor": 1.8845,
-        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.8845 to the unsampled span-observed volume (0.409086/s)."
-      },
-      {
-        "key": "/api/checkout",
+        "key": "/oteldemo.CartService/GetCart",
         "source": "span",
         "rumRate": null,
-        "spanRate": 0.25022,
+        "spanRate": 2.294653,
         "extrapolationFactor": null,
         "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
       },
       {
-        "key": "/api/cart/invalid-chaos-endpoint",
+        "key": "/api/cart",
+        "source": "rum",
+        "rumRate": 1.617072,
+        "spanRate": 2.074699,
+        "extrapolationFactor": 1.283,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.283 to the unsampled span-observed volume (2.0747/s)."
+      },
+      {
+        "key": "/api/recommendations",
+        "source": "rum",
+        "rumRate": 1.883322,
+        "spanRate": 2.045613,
+        "extrapolationFactor": 1.0862,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0862 to the unsampled span-observed volume (2.04561/s)."
+      },
+      {
+        "key": "/api/data",
+        "source": "rum",
+        "rumRate": 1.321921,
+        "spanRate": 1.452905,
+        "extrapolationFactor": 1.0991,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0991 to the unsampled span-observed volume (1.4529/s)."
+      },
+      {
+        "key": "/get-quote",
         "source": "span",
         "rumRate": null,
-        "spanRate": 0.007234,
+        "spanRate": 1.036424,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/getquote",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 1.036331,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/shipping",
+        "source": "rum",
+        "rumRate": 0.744306,
+        "spanRate": 0.784942,
+        "extrapolationFactor": 1.0546,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0546 to the unsampled span-observed volume (0.784942/s)."
+      },
+      {
+        "key": "/api/products",
+        "source": "rum",
+        "rumRate": 0.654248,
+        "spanRate": 0.746308,
+        "extrapolationFactor": 1.1407,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.1407 to the unsampled span-observed volume (0.746308/s)."
+      },
+      {
+        "key": "/oteldemo.CartService/AddItem",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.47625,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/currency",
+        "source": "rum",
+        "rumRate": 0.218171,
+        "spanRate": 0.410278,
+        "extrapolationFactor": 1.8805,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.8805 to the unsampled span-observed volume (0.410278/s)."
+      },
+      {
+        "key": "/api/products/:id:",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.280544,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/oteldemo.CartService/EmptyCart",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.275938,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/checkout",
+        "source": "rum",
+        "rumRate": 0.210856,
+        "spanRate": 0.251343,
+        "extrapolationFactor": 1.192,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.192 to the unsampled span-observed volume (0.251343/s)."
+      },
+      {
+        "key": "/ship-order",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.247743,
         "extrapolationFactor": null,
         "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
       }
     ],
     "summary": {
-      "keys": 10,
-      "rumPrimaryKeys": 8,
-      "spanFallbackKeys": 2,
-      "droppedRumOnlyKeys": 0,
-      "rumDrivenShare": 0.9871,
-      "meanExtrapolationFactor": 1.1016,
+      "keys": 14,
+      "rumPrimaryKeys": 7,
+      "spanFallbackKeys": 7,
+      "droppedRumOnlyKeys": 3,
+      "rumDrivenShare": 0.579,
+      "meanExtrapolationFactor": 1.248,
       "extrapolationFactorRange": [
-        0.2025,
-        1.8845
+        1.0546,
+        1.8805
       ]
     }
   }

@@ -1,28 +1,27 @@
-"""ISI-5719 — assemble the RUM-primary ordered-journey model for wkf10640 / Astroshop.
+"""ISI-5719 — assemble RUM-primary ordered-journey models from live `user.events` (wkf10640).
 
-Consumes the live `user.events` extraction (board granted `storage:user.events:read` on the
-wkf10640 dt0s16 token, 2026-10-13) and the span side, producing the merged model + a side-by-side
-report. Reads the raw DQL JSON pulled by the caller (dtctl, context `tenant-b-events`) from
-`/tmp/*.json` — see the header of each file for the exact query — and emits deterministic artifacts.
+Scope `storage:user.events:read` granted on the wkf10640 dt0s16 token (board, 2026-10-13), so
+the drop-in `rum_events.py` stitcher runs on real data. **App-agnostic by design** — the same
+pipeline runs for any RUM app in the tenant; this script ships two: `Astroshop` (otel-demo
+e-commerce) and `EasyTrade` (a wholly different trading app), to prove it's not app-specific.
 
-Pipeline:
-  journeys.json  (per-session ordered view arrays)  -> ordered journey templates (weighted)
-  think.json     (per-page view_summary duration pctls) -> per-step measured think-times
-  rum_ep.json    (per-endpoint RUM request req/s)    -> RUM-primary endpoint rates
-  span_ep.json   (per-endpoint server-span req/s)    -> span truth
-                 reconciled via source_merge.merge_plan -> per-endpoint overlap + extrapolation
+Pipeline per app (data pulled by the caller via dtctl context `tenant-b-events`, DQL headers in
+each `/tmp/*.json`):
+  <journeys>  per-session ordered view arrays (view.name, canonicalised in DQL)  -> journey templates
+  <think>     per-page view_summary duration pctls                               -> measured think-times
+  <rum_ep>    per-endpoint RUM request counts (raw url.path)   -> Python-canonicalised, static-asset
+  <span_ep>   per-endpoint server-span counts (raw url.path)   -> filtered, then source_merge.merge_plan
 
-Modeling note (real-data finding): in this RUM dataset `user_action` events are labelled by
-their *page* (no distinct action name), so the clean use-case sequence is the ordered
-`view_summary` views; `rum_events.journey_templates` over views-only is the authoritative
-sequence (including actions double-counts the page). Think-time per step = the view's dwell
-(`view_summary.duration`), which is exactly the inter-action pacing the model needs.
+Endpoint canonicalisation is shared & deterministic (templating numeric/uuid/hex id segments,
+dropping browser static assets) so RUM browser paths and server-span paths join where they match;
+the rest fall to span-only (internal/proxy-rewritten) exactly as the board's merge rules intend.
 """
 
 from __future__ import annotations
 
 import collections
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -30,35 +29,61 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 import source_merge  # noqa: E402
 
-WINDOW_S = 86400.0          # 24h extraction window
-SESSIONS = 18773            # distinct Astroshop sessions in window (countDistinctExact)
+WINDOW_S = 86400.0
 OUT = Path("loadtests/wkf10640-astroshop-frontend")
 
+# --- shared endpoint canonicalisation -------------------------------------------------------
+_STATIC = re.compile(
+    r"(\.(js|css|svg|ico|png|jpe?g|gif|woff2?|map)$)|ruxitagentjs|/_next/|/assets/|favicon", re.I)
+_SEG_NUM = re.compile(r"/\d+(?=/|$)")
+_SEG_UUID = re.compile(r"/[0-9a-fA-F]{8}-[0-9a-fA-F-]{20,}(?=/|$)")
+_SEG_HEX = re.compile(r"/[0-9A-Z]{8,}(?=/|$)")           # astroshop product slugs e.g. HQTGWGPNH4
+_IMG = re.compile(r"/api/images/[^/]+$")
 
-def _load(name: str) -> list[dict]:
-    return json.loads(Path(f"/tmp/{name}").read_text())["records"]
+
+def is_static(path: str) -> bool:
+    return bool(_STATIC.search(path)) or path in ("", "/")
 
 
-def journey_templates() -> list[dict]:
-    seqs: collections.Counter = collections.Counter()
-    recs = _load("journeys.json")
+def canon_endpoint(path: str) -> str:
+    p = _IMG.sub("/api/images/:file:", path)
+    p = _SEG_UUID.sub("/:uuid:", p)
+    p = _SEG_NUM.sub("/:id:", p)
+    p = _SEG_HEX.sub("/:id:", p)
+    return p
+
+
+def endpoint_rates(path_counts_file: str) -> dict[str, float]:
+    """Raw {path,c} rows -> canonical endpoint -> req/s, dropping browser static assets."""
+    agg: collections.Counter = collections.Counter()
+    for r in json.loads(Path(f"/tmp/{path_counts_file}").read_text())["records"]:
+        path = r.get("path") or ""
+        if is_static(path):
+            continue
+        agg[canon_endpoint(path)] += int(r["c"])
+    return {k: round(v / WINDOW_S, 6) for k, v in agg.items()}
+
+
+# --- per-app assembly -----------------------------------------------------------------------
+
+def journey_templates(journeys_file: str):
+    recs = json.loads(Path(f"/tmp/{journeys_file}").read_text())["records"]
     total = len(recs)
+    seqs: collections.Counter = collections.Counter()
     for r in recs:
         seqs[" > ".join(r.get("views") or [])] += 1
-    out = []
-    for journey, n in seqs.most_common():
-        out.append({
-            "sequence": journey.split(" > ") if journey else [],
-            "sessions": n,
-            "weight": round(n / total, 4),
-            "steps": len(journey.split(" > ")) if journey else 0,
-        })
+    out = [{
+        "sequence": j.split(" > ") if j else [],
+        "sessions": n,
+        "weight": round(n / total, 4),
+        "steps": len(j.split(" > ")) if j else 0,
+    } for j, n in seqs.most_common()]
     return out, total
 
 
-def think_times() -> dict:
+def think_times(think_file: str) -> dict:
     out = {}
-    for r in _load("think.json"):
+    for r in json.loads(Path(f"/tmp/{think_file}").read_text())["records"]:
         out[r["page"]] = {
             "n": int(r["n"]),
             "p50Ms": round(float(r["p50"]) / 1e6, 1),
@@ -70,83 +95,75 @@ def think_times() -> dict:
     return out
 
 
-def endpoint_rates(name: str, api_only: bool = True) -> dict[str, float]:
-    rates = {}
-    for r in _load(name):
-        ep = r["ep"]
-        if api_only and not ep.startswith("/api/"):
-            continue
-        rates[ep] = round(int(r["c"]) / WINDOW_S, 6)
-    return rates
+APPS = [
+    {"key": "astroshop", "app": "Astroshop", "sessions": 18773, "spanNs": "astroshop",
+     "journeys": "journeys.json", "think": "think.json",
+     "rum_ep": "as_rum_ep.json", "span_ep": "as_span_ep.json",
+     "note": "otel-demo e-commerce"},
+    {"key": "easytrade", "app": "EasyTrade", "sessions": 15351, "spanNs": "easytrade",
+     "journeys": "et_journeys.json", "think": "et_think.json",
+     "rum_ep": "et_rum_ep.json", "span_ep": "et_span_ep.json",
+     "note": "trading app — a wholly different app from Astroshop"},
+]
 
 
-def main() -> None:
-    templates, total = journey_templates()
-    think = think_times()
-    rum_rates = endpoint_rates("rum_ep.json")
-    span_rates = endpoint_rates("span_ep.json")
+def build(app: dict) -> dict:
+    templates, total = journey_templates(app["journeys"])
+    think = think_times(app["think"])
+    rum_rates = endpoint_rates(app["rum_ep"])
+    span_rates = endpoint_rates(app["span_ep"])
     merge = source_merge.merge_plan(rum_rates, span_rates)
-
     model = {
-        "source": {
-            "tenant": "wkf10640",
-            "app": "Astroshop",
-            "object": "user.events",
-            "windowHours": 24,
-            "sessions": SESSIONS,
-            "scope": "storage:user.events:read (granted 2026-10-13)",
-            "rumSpanJoinKey": "trace.id / span.id present on request events",
-        },
+        "source": {"tenant": "wkf10640", "app": app["app"], "object": "user.events",
+                   "windowHours": 24, "sessions": app["sessions"], "spanNamespace": app["spanNs"],
+                   "scope": "storage:user.events:read (granted 2026-10-13)", "note": app["note"]},
         "journeyTemplates": templates,
         "thinkTimeByPage": think,
         "perEndpointMerge": merge,
     }
-    OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "rum-journey-model.json").write_text(json.dumps(model, indent=2))
+    (OUT / f"rum-journey-model-{app['key']}.json").write_text(json.dumps(model, indent=2))
+    return model
 
-    # ---- markdown side-by-side ----
-    L = []
-    L.append("# wkf10640 / Astroshop — RUM-primary ordered journeys (ISI-5719)")
-    L.append("")
-    L.append(f"Live `user.events` extraction, 24h, **{SESSIONS:,} sessions**. Scope "
-             "`storage:user.events:read` granted 2026-10-13 (board token).")
-    L.append("")
-    L.append(f"## Ordered journey templates ({len(templates)} distinct, top 10)")
-    L.append("")
-    L.append("| sessions | weight | steps | sequence |")
-    L.append("|---:|---:|---:|---|")
-    for t in templates[:10]:
+
+def md_section(model: dict) -> list[str]:
+    s = model["source"]
+    L = [f"# wkf10640 / {s['app']} — RUM-primary ordered journeys (ISI-5719)", "",
+         f"_{s['note']}._ Live `user.events`, 24h, **{s['sessions']:,} sessions**.", "",
+         f"## Ordered journey templates ({len(model['journeyTemplates'])} distinct, top 8)", "",
+         "| sessions | weight | steps | sequence |", "|---:|---:|---:|---|"]
+    for t in model["journeyTemplates"][:8]:
         L.append(f"| {t['sessions']:,} | {t['weight']*100:.1f}% | {t['steps']} | "
                  f"`{' > '.join(t['sequence'])}` |")
-    L.append("")
-    L.append("## Measured per-page think-time (view dwell, ms)")
-    L.append("")
-    L.append("| page | n | p50 | p90 | p99 | mean |")
-    L.append("|---|---:|---:|---:|---:|---:|")
-    for page, d in think.items():
-        L.append(f"| `{page}` | {d['n']:,} | {d['p50Ms']:.0f} | {d['p90Ms']:.0f} | "
-                 f"{d['p99Ms']:.0f} | {d['meanMs']:.0f} |")
-    L.append("")
-    L.append("## Per-endpoint overlap & extrapolation (RUM ⟗ spans, `/api/*`)")
-    L.append("")
-    L.append("| endpoint | source | RUM req/s | span req/s | factor |")
-    L.append("|---|---|---:|---:|---:|")
-    for e in merge["entries"]:
+    L += ["", "## Measured per-page think-time (view dwell, ms)", "",
+          "| page | n | p50 | p90 | mean |", "|---|---:|---:|---:|---:|"]
+    for page, d in model["thinkTimeByPage"].items():
+        L.append(f"| `{page}` | {d['n']:,} | {d['p50Ms']:.0f} | {d['p90Ms']:.0f} | {d['meanMs']:.0f} |")
+    m = model["perEndpointMerge"]; su = m["summary"]
+    L += ["", "## Per-endpoint overlap & extrapolation (RUM ⟗ spans)", "",
+          "| endpoint | source | RUM req/s | span req/s | factor |", "|---|---|---:|---:|---:|"]
+    for e in m["entries"][:12]:
         rr = f"{e['rumRate']:.3f}" if e["rumRate"] is not None else "—"
         sr = f"{e['spanRate']:.3f}" if e["spanRate"] is not None else "—"
         fa = f"{e['extrapolationFactor']:.2f}" if e["extrapolationFactor"] is not None else "—"
         L.append(f"| `{e['key']}` | {e['source']} | {rr} | {sr} | {fa} |")
-    s = merge["summary"]
-    L.append("")
-    L.append(f"**Summary:** {s['keys']} endpoints · {s['rumPrimaryKeys']} RUM-primary · "
-             f"{s['spanFallbackKeys']} span-only · rumDrivenShare {s['rumDrivenShare']} · "
-             f"mean extrapolation ×{s['meanExtrapolationFactor']} "
-             f"(range {s['extrapolationFactorRange']}).")
-    (OUT / "rum-journey-sidebyside.md").write_text("\n".join(L) + "\n")
+    L += ["", f"**Summary:** {su['keys']} endpoints · {su['rumPrimaryKeys']} RUM-primary · "
+          f"{su['spanFallbackKeys']} span-only · rumDrivenShare {su['rumDrivenShare']} · "
+          f"mean extrapolation ×{su['meanExtrapolationFactor']}.", ""]
+    return L
 
-    print("journey templates:", len(templates), "| think pages:", len(think),
-          "| endpoints merged:", s["keys"], "rum-primary", s["rumPrimaryKeys"])
-    print("wrote", OUT / "rum-journey-model.json", "and", OUT / "rum-journey-sidebyside.md")
+
+def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    md = []
+    for app in APPS:
+        model = build(app)
+        md += md_section(model) + ["---", ""]
+        su = model["perEndpointMerge"]["summary"]
+        print(f"{app['app']}: {len(model['journeyTemplates'])} templates, "
+              f"{len(model['thinkTimeByPage'])} pages, {su['keys']} endpoints "
+              f"({su['rumPrimaryKeys']} rum-primary), rumDrivenShare {su['rumDrivenShare']}")
+    (OUT / "rum-journey-sidebyside.md").write_text("\n".join(md))
+    print("wrote per-app models + rum-journey-sidebyside.md")
 
 
 if __name__ == "__main__":
