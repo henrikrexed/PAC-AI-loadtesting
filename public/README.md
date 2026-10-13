@@ -41,17 +41,29 @@ Why it is built this way:
 
 ```
 skills/          agent-ready skill definitions (SKILL.md + deterministic scripts + tests)
-  workload-model/    SCOPE — telemetry → G0-validated workload model + proposal
+  workload-model/    SCOPE — telemetry → G0-validated workload model + proposal (the engine)
   k6-synthesis/      SYNTHESIZE — approved model → k6 code + payload pools (V2a)
   loadtest-run/      EXECUTE — smoke gate, caps/abort supervisor, run reports (V2b)
   baseline-diff/     ANALYZE — shape-diff vs baseline, R5 cross-check (V3)
   rum-sessions/      RUM user-session shape & coverage (Dynatrace Grail)
   session-stitch/    session reconstruction from OTel session.id on spans
 utilities/       standalone CLIs: rum_sessions.py, session_stitch.py (no telemetry I/O)
+docs/            methodology, usage, engine, requirements, skills-install
 tutorial/        end-to-end walkthrough incl. a deployable demo AI-agent component
-examples/        sanitized example artifacts from real runs
+  otel-demo/         the baggage-promotion + OTLP-export collector the loop needs
+examples/        sanitized, 100% synthetic example artifacts
 tools/           secret-scan.sh (run before publishing anything)
 ```
+
+## Documentation
+
+| Doc | What it covers |
+|---|---|
+| [`docs/methodology.md`](docs/methodology.md) | The method: principles, the five-stage loop, every gate, dual-source session reconstruction, safety rules, fidelity caveats |
+| [`docs/usage.md`](docs/usage.md) | End-to-end usage — no-backend quickstart, running the loop against your own tenant, the full tutorial |
+| [`docs/engine.md`](docs/engine.md) | The workload-model engine: install per platform (binary / Docker / k8s / source) and its role in the loop |
+| [`docs/requirements.md`](docs/requirements.md) | Dynatrace tokens + **scopes**, `dtctl` + its agent skill, Davis AI, everything else |
+| [`docs/skills-install.md`](docs/skills-install.md) | Installing the skills into Claude Code, opencode, Cursor, or any agentskills.io agent |
 
 ## Quickstart
 
@@ -75,7 +87,9 @@ demo CrewAI agent app, generates a baseline window, and runs all five stages for
 
 All environment wiring is documented in [`.env.example`](.env.example) — copy to `.env`,
 fill in your values, never commit a real `.env`. Two tokens by design: a read-only DQL
-token and a separate OTLP ingest token.
+token and a separate OTLP ingest token. The exact **token scopes** (including
+`storage:user.events:read`, the one that is easy to miss for RUM-driven journeys) and the
+`dtctl` setup are in [`docs/requirements.md`](docs/requirements.md).
 
 The backend is currently **Dynatrace (Grail/DQL)** for extraction and analysis. The
 deterministic core (clustering, shaping, emission, gates) is backend-agnostic — the DQL
@@ -85,9 +99,20 @@ k6 and run anywhere k6 runs.
 ## Requirements
 
 - Python 3.11+, Node.js 20+, k6 (only for EXECUTE; skills degrade to `node --check`)
-- A Dynatrace environment (trial works) for the live loop
+- A Dynatrace environment (trial works) for the live loop — tokens + scopes in
+  [`docs/requirements.md`](docs/requirements.md)
 - Each `skills/*/` directory is self-contained with its own tests:
   `python3 -m pytest` / `node --test` inside it
+
+## Installing
+
+- **Engine** — grab a released binary (linux/macOS/windows), the multi-arch Docker image
+  `ghcr.io/henrikrexed/ai-performance-testing`, or run from source. All paths:
+  [`docs/engine.md`](docs/engine.md).
+- **Skills** — copy `skills/*` onto your agent's skills path (Claude Code, opencode,
+  Cursor, or any agentskills.io agent): [`docs/skills-install.md`](docs/skills-install.md).
+- **Backend** — install `dtctl`, set a context, and mint the read-only DQL token:
+  [`docs/requirements.md`](docs/requirements.md).
 
 ## Using the skills with a coding agent
 
@@ -95,7 +120,8 @@ The `skills/*/SKILL.md` files follow the agent-skill convention. Install them in
 coding agent (Claude Code, opencode, Cursor, …), point `DT_ENDPOINT`/`DT_API_TOKEN` at
 your tenant, and ask for the loop: *"scope a load test for service X over the last 3
 hours"*. The agent runs the DQL and the deterministic scripts; you get the proposal at
-the VALIDATE gate. Nothing runs without your approval.
+the VALIDATE gate. Nothing runs without your approval. Full walkthrough in
+[`docs/usage.md`](docs/usage.md).
 
 ## License
 

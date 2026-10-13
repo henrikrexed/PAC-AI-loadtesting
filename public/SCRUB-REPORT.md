@@ -100,3 +100,42 @@ name, so the audit trail ships without echoing internal identifiers.
 | `utilities` CLIs (stdin smoke) | shape/cover + stitch/cover OK |
 
 No real RUM/customer data in any fixture; all fixtures synthetic and labelled as such.
+
+## 4. Phase 6c — full-tree assembly (clean publishable layout)
+
+Phase 6a (above) scrubbed `skills/` + `utilities/`. Phase 6c assembles the remaining
+layout and re-scans the **whole** tree. The pre-publish scan (`tools/secret-scan.sh`,
+hardened: tokens, tenant/env URLs, RFC1918 IPs, credential-looking assignments, internal
+tenant/namespace ids, issue ids, platform-name and project-name variants) now runs over
+`skills/ utilities/ docs/ examples/ tutorial/ tools/ .github/` and **PASSES (0 hits)**.
+
+Added / reconciled:
+
+- **`examples/`** — 100% synthetic sample artifacts (workload-model, k6 render, baseline
+  diff, dual-source session reconstruction). Every tenant/service/customer name invented,
+  every session id a fake uuid, every number representative — no extracted data. Labelled
+  as such in `examples/README.md`.
+- **`docs/` (curated subset per §7)** — `methodology.md` (authored fresh for public
+  release — the internal methodology was a board-planning changelog and was **not**
+  shipped), plus `usage.md`, `engine.md`, `requirements.md`, `skills-install.md` (token
+  scopes, `dtctl` + its agent skill, engine install per platform → release artifacts,
+  skills install). **Excluded by construction:** `docs/evidence/`, internal runbooks,
+  phase/decision docs, engine-research notes.
+- **`tutorial/otel-demo/collector.yaml`** — the baggage-promotion + OTLP-export collector,
+  rewritten generic (tenant ids, internal benchmark narrative, issue labels, and the
+  cluster-specific interposition notes removed; env-var secret refs + a placeholder
+  `demo-app` namespace retained).
+- **`deploy/` → consolidated into `tutorial/`.** Plan §5 mandates a *self-contained
+  tutorial* and explicitly "reconcile duplication with `public/ tutorial/`". A parallel
+  top-level `deploy/` would re-introduce exactly that duplication (the sanitized agentapp
+  already lives at `tutorial/component/`), so the deployable bundle is kept in one place:
+  the agentapp component under `tutorial/component/` + the collector under
+  `tutorial/otel-demo/`. No separate `deploy/` directory is shipped.
+- **Removed from the tree:** internal push-staging notes (carrying commit SHAs / local
+  paths / issue ids) — relocated out of the publishable tree. Stray `__pycache__/`/`*.pyc`
+  purged. One dangling internal path ref in the tutorial app docstring and one internal
+  doc pointer in `loadtest-run` neutralized.
+
+The `.github/workflows/` (release/docker/secret-scan CI) and `tools/` scanner + publish
+tooling are owned by the sibling children (CI/binaries + fresh-history publish); this
+assembly left them untouched.

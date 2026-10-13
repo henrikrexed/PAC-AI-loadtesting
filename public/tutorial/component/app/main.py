@@ -1,7 +1,7 @@
 """FastAPI front-end for the CrewAI + DeepSeek demo agent app.
 
 One endpoint, POST /request, runs a single agent turn and returns the answer. The load
-driver (loadtests/agentapp-deepseek/driver.js) hits this with a controlled mix of
+driver (../loadgen/driver.js) hits this with a controlled mix of
 turn_type=tool and turn_type=chat to drive the two behavioral archetypes.
 
 Tracing is initialised before the agent module imports its tracer so spans land on the

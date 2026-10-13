@@ -1,0 +1,409 @@
+{
+  "kind": "record",
+  "id": "cartItem",
+  "seed": 42,
+  "pii": "none (PII-free generators; emails on @synthetic.invalid)",
+  "count": 100,
+  "records": [
+    {
+      "productId": "SKU-0001",
+      "quantity": 601
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 448
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 852
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 669
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 174
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 526
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 273
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 624
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 865
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 472
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 249
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 882
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 745
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 307
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 197
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 500
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 686
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 610
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 3
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 470
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 837
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 51
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 592
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 31
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 266
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 61
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 185
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 783
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 530
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 27
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 173
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 842
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 487
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 809
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 319
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 449
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 37
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 51
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 556
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 596
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 245
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 645
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 209
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 303
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 738
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 858
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 507
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 204
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 284
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 292
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 74
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 659
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 680
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 693
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 927
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 87
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 943
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 431
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 942
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 137
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 110
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 15
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 360
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 481
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 611
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 899
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 77
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 719
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 934
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 278
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 706
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 179
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 520
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 821
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 120
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 995
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 562
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 916
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 433
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 578
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 336
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 596
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 322
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 729
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 295
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 449
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 843
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 695
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 994
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 890
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 431
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 545
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 295
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 100
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 696
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 313
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 785
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 904
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 93
+    },
+    {
+      "productId": "SKU-0001",
+      "quantity": 475
+    }
+  ]
+}

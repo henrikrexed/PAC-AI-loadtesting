@@ -160,9 +160,8 @@ def dtctl_synthetic_probe(run_config: dict, dtctl: str = "dtctl") -> int:
 class K6Runner:
     """Real k6 adapter. Requires k6 (with xk6-output-opentelemetry) on PATH.
 
-    Not exercised by the offline unit tests (k6 absent — the S0 provisioning backlog
-    item in docs/skills-mcp-decisions.md). Present so the skill runs end-to-end once
-    k6 is provisioned.
+    Not exercised by the offline unit tests (k6 absent). Present so the skill runs
+    end-to-end once k6 is provisioned.
     """
 
     def __init__(self, k6: str = "k6", dtctl: str = "dtctl"):
