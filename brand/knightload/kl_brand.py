@@ -48,6 +48,14 @@ for cand in [
 if _FDIR is None:
     raise SystemExit("no DejaVu font dir found")
 
+# Production display face: Space Grotesk (vendored variable TTF, OFL). When present
+# the raster wordmark renders in the real brand font — this IS publish-time item #1
+# (install Space Grotesk/Sora + re-run). Falls back to DejaVu Bold stand-in otherwise.
+_BRANDDIR = os.path.join(os.path.dirname(__file__), "fonts")
+_SG = os.path.join(_BRANDDIR, "SpaceGrotesk-VF.ttf")
+_SORA = os.path.join(_BRANDDIR, "Sora-VF.ttf")
+_HAS_SG = os.path.isfile(_SG)
+
 _CACHE = {}
 def font(size, bold=True, mono=False):
     key = (size, bold, mono)
@@ -55,9 +63,18 @@ def font(size, bold=True, mono=False):
         return _CACHE[key]
     if mono:
         fn = "DejaVuSansMono-Bold.ttf" if bold else "DejaVuSansMono.ttf"
+        f = ImageFont.truetype(os.path.join(_FDIR, fn), size)
+    elif _HAS_SG:
+        # Space Grotesk variable font: default axis weight is Light (300) — set the
+        # named instance explicitly so bold reads as Bold, regular as Regular.
+        f = ImageFont.truetype(_SG, size)
+        try:
+            f.set_variation_by_name("Bold" if bold else "Regular")
+        except Exception:
+            pass
     else:
         fn = "DejaVuSans-Bold.ttf" if bold else "DejaVuSans.ttf"
-    f = ImageFont.truetype(os.path.join(_FDIR, fn), size)
+        f = ImageFont.truetype(os.path.join(_FDIR, fn), size)
     _CACHE[key] = f
     return f
 
