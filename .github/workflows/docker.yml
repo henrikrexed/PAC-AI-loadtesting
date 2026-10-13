@@ -87,7 +87,12 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # CR_PAT (fine-grained PAT with packages:write) takes priority over the
+          # built-in GITHUB_TOKEN.  If the repo "Workflow permissions" are still
+          # set to read-only in Settings → Actions → General, add CR_PAT as a
+          # repo secret (Settings → Secrets → Actions) to unblock GHCR pushes
+          # without changing the default permissions setting.
+          password: ${{ secrets.CR_PAT || secrets.GITHUB_TOKEN }}
 
       - name: Image metadata
         id: meta
