@@ -85,7 +85,7 @@ def visual_system():
         ("BG0", T.BG0, "base"), ("BG1", T.BG1, "panel"), ("BG2", T.BG2, "raised"),
         ("LINE", T.LINE2, "border"),
         ("GREEN", T.GREEN, "signal / truth"), ("RED", T.RED, "red pill · the gate"),
-        ("BLUE", T.BLUE, "blue pill · guess"), ("AMBER", T.AMBER, "caution · 403"),
+        ("BLUE", T.BLUE, "blue pill · guess"), ("AMBER", T.AMBER, "caution · unavail"),
         ("INK", T.INK, "text"), ("MUTE", T.MUTE, "text 2"),
     ]
     x = 90
@@ -119,7 +119,7 @@ def visual_system():
     # lock + badge
     lock(d, (mx+40, 806), size=46, color=T.RED)
     text_l(d, (mx+90, 786), "V1 gate (the Oracle)", font("mono", 24), fill=T.INK)
-    badge(d, (mx+90, 826), "403 · scope-gated", font("mono", 22, bold=True), fg=T.AMBER)
+    badge(d, (mx+90, 826), "logs · unavailable", font("mono", 22, bold=True), fg=T.AMBER)
     # rain sample
     rb = [mx+620, 600, mx+880, 850]
     panel(d, rb, fill=T.BG1, outline=T.LINE)
@@ -134,7 +134,7 @@ def visual_system():
     rules = [
         "Theme = punctuation, not argument. In the technical core, numbers carry the weight.",
         "ONE structural accent (green). Red/blue only where guess-vs-truth is the actual point.",
-        "Reserve the glitch treatment for the sampling slide. Dashed+amber = 'unavailable / 403'.",
+        "Reserve the glitch treatment for the sampling slide. Dashed+amber = 'unavailable' (logs leg).",
         "Every Matrix line maps to a real technical claim — or it gets cut.",
     ]
     yy = 1004
@@ -281,8 +281,8 @@ def master_demo(exemplar=False):
         ("$ ./run-demo-live.sh", T.INK),
         ("[1/4] fetch spans + fetch user.sessions  → live DQL …", T.GREEN_HI),
         ("      root traces ≈ 321k · browser 99% · buyer 1% · samplingRatio 1.0", T.MUTE),
-        ("      fetch user.events … 403 NOT_AUTHORIZED_FOR_TABLE   ← glitch in the Matrix", T.AMBER),
-        ("      degrade → spans + user.sessions (lossless)", T.FAINT),
+        ("      fetch user.events … 18,773 sessions → 16 ordered journeys   ← the wall came down", T.GREEN_HI),
+        ("      model sized from spans + user.sessions · user.events = bonus (degrade-safe)", T.FAINT),
         ("      G0 gate … 12/12  ✓", T.GREEN),
         ("", T.INK),
         ("[gate] approve model revision <hash>?  (human)  ▸ y", T.RED),
@@ -295,7 +295,7 @@ def master_demo(exemplar=False):
         text_l(d, (tb[0]+40, yy), s, tf, fill=col)
         yy += 48
     if not exemplar:
-        text_c(d, W//2, H-110, "MASTER · demo · terminal chrome · green-on-black · LIVE badge · 403 + gate highlighted",
+        text_c(d, W//2, H-110, "MASTER · demo · terminal chrome · green-on-black · LIVE badge · live user.events + gate highlighted",
                font("mono", 24), fill=T.FAINT)
     chrome(d, ("§3 · the demo" if exemplar else "master · demo"), 15 if exemplar else 0)
     name = "slide-15-demo" if exemplar else "master-demo"

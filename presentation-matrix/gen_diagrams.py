@@ -247,11 +247,11 @@ def d3_dual():
     text_c(d, (rx0+(rx0+rx1)//2)//2+18, ltop+186, "fetch user.sessions", font("mono", 26, bold=True), fill=T.GREEN_HI)
     text_c(d, (rx0+(rx0+rx1)//2)//2+18, ltop+228, "1 row / real session", font("mono", 21), fill=T.MUTE)
     badge(d, (rx0+150, ltop+252), "LIVE · 35,679 / 24h", font("mono", 20, bold=True), fg=T.GREEN)
-    # user.events (403)
-    chip(d, [(rx0+rx1)//2+18, ltop+150, rx1-70, ltop+300], fill=(26,20,12), outline=T.AMBER)
-    text_c(d, (rx1+(rx0+rx1)//2)//2-18, ltop+186, "fetch user.events", font("mono", 26, bold=True), fill=T.AMBER)
+    # user.events (live — scope granted ISI-5719)
+    chip(d, [(rx0+rx1)//2+18, ltop+150, rx1-70, ltop+300], fill=T.BG3, outline=T.GREEN)
+    text_c(d, (rx1+(rx0+rx1)//2)//2-18, ltop+186, "fetch user.events", font("mono", 26, bold=True), fill=T.GREEN_HI)
     text_c(d, (rx1+(rx0+rx1)//2)//2-18, ltop+228, "ordered actions + think-time", font("mono", 19), fill=T.MUTE)
-    badge(d, ((rx0+rx1)//2+110, ltop+252), "403 · scope-gated", font("mono", 20, bold=True), fg=T.AMBER)
+    badge(d, ((rx0+rx1)//2+110, ltop+252), "LIVE · 16 journeys", font("mono", 20, bold=True), fg=T.GREEN)
     text_c(d, (rx0+rx1)//2, ltop+352, "real journeys · real arrival curve · real device / geo / network",
            font("mono", 22), fill=T.INK)
     text_c(d, (rx0+rx1)//2, ltop+410, "volume merge needs only user.sessions + spans (live today)",
@@ -366,9 +366,8 @@ def d5_stack():
     text_c(d, gx0+gw//2, gb[1]+175, "spans  (traces)", font("mono", 30, bold=True), fill=T.GREEN_HI)
     chip(d, [gx0+50, gb[1]+232, gx0+gw-50, gb[1]+302], fill=T.BG3, outline=T.RED)
     text_c(d, gx0+gw//2, gb[1]+267, "RUM · user.sessions", font("mono", 28, bold=True), fill=T.RED)
-    chip(d, [gx0+50, gb[1]+324, gx0+gw-50, gb[1]+394], fill=(26,20,12), outline=T.AMBER)
-    text_c(d, gx0+gw//2, gb[1]+350, "user.events", font("mono", 26, bold=True), fill=T.AMBER)
-    badge(d, (gx0+gw//2-118, gb[1]+372), "403 scope-gated", font("mono", 18, bold=True), fg=T.AMBER)
+    chip(d, [gx0+50, gb[1]+324, gx0+gw-50, gb[1]+394], fill=T.BG3, outline=T.RED)
+    text_c(d, gx0+gw//2, gb[1]+360, "RUM · user.events", font("mono", 26, bold=True), fill=T.RED)
 
     # 4 the built part: agent -> skill -> engine (stacked column)
     cx0 = 1930; cw = 340
@@ -409,10 +408,10 @@ def d5_stack():
     # logs dashed (unavailable)
     dashed_line(d, (b2[2]+14, rowy+150), (gx0-14, rowy+150), fill=T.AMBER, width=4)
     text_c(d, (b2[2]+gx0)//2, rowy+180, "logs — empty on this tenant", font("mono", 20), fill=T.AMBER)
-    # grail -> built column (spans solid, events dashed)
+    # grail -> built column (spans solid; user.events now solid — live, scope granted ISI-5719)
     arrow(d, (gx0+gw+14, rowy-60), (cx0-14, rowy-150), color=T.GREEN, width=6, head=20)
-    dashed_line(d, (gx0+gw+14, rowy+120), (cx0-14, rowy+40), fill=T.AMBER, width=4)
-    text_c(d, (gx0+gw+cx0)//2+10, rowy+150, "user.events 403", font("mono", 19), fill=T.AMBER)
+    arrow(d, (gx0+gw+14, rowy+120), (cx0-14, rowy+40), color=T.RED, width=6, head=20)
+    text_c(d, (gx0+gw+cx0)//2+10, rowy+150, "user.events → journeys", font("mono", 19), fill=T.RED)
     # engine -> gate -> renderers
     arrow(d, (built_boxes[2][2]+10, rowy), (gatex-80, rowy), color=T.GREEN, width=6, head=20)
     arrow(d, (gatex+80, rowy), (rx0-14, rowy), color=T.RED, width=6, head=20)
