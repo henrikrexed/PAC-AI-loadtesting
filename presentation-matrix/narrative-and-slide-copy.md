@@ -3,7 +3,12 @@
 
 *ISI-5722 (workstream A) · child of [ISI-5720](/ISI/issues/ISI-5720) · theme **The Matrix** 🔴💊 approved by the board (plan rev `d09391e7`)*
 *Speaker: Henrik Rexed · IsItObservable · Format: PAC expert session, 30 min (~22 min content + ~8 min room discussion)*
-*Draft v1 · 2026-10-12 · Content Writer*
+*Draft v2 · 2026-10-13 · Content Writer*
+
+> **rev2 changelog (folded from [ISI-5720](/ISI/issues/ISI-5720) plan rev2):**
+> 1. **New slide #13 — "Architecture: the stack in our cluster."** A recap of the real wired stack (Astroshop/otel-demo → OTel Collector → Dynatrace Grail spans+RUM → agent + skill + engine → renderers) with repo + all-asset links. All later slides shift +1 (old 13→14 … old 20→21).
+> 2. **Demo (now slides 15–18) is FULL LIVE end-to-end.** No committed `workload-model.json` as the source: live DQL (`fetch spans` + `fetch user.sessions`) → materialize the Astroshop model → live V1 gate → render k6 + JMeter, on stage. The `user.events` 403 is narrated as a real "glitch in the Matrix"; a rehearsed recorded run is the fallback. Narration rewritten accordingly.
+> 3. **Repo/asset links** added to the new #13 and the close slide (now #21).
 
 > **How to read this doc.**
 > - **Part 1** — theme spine + the film-beat→process map every themed line must sit on.
@@ -30,12 +35,12 @@ Every themed line on every slide maps to a **real technical claim**. If a Matrix
 | **Red pill** — "you stay in Wonderland, and I show you how deep the rabbit hole goes" | Observability: production telemetry is the ground truth | 2, 5 |
 | **"Residual self image… the mental projection of your digital self"** | The workload **model** — a projection of reality, only as complete as what you sampled | 8, 11, 12 |
 | **"Déjà vu… a glitch in the Matrix. It happens when they change something"** (Trinity) | **Sampling artifacts** — the gaps a sampled trace stream leaves when you extrapolate | 6 |
-| **"This is the Construct. It's our loading program. We can load anything…"** | The **engine** — loads a runnable world (the test config) from the model | 12 |
-| **"Guns. Lots of guns."** (materialize an arsenal on demand) | Renderers materialize **k6 / JMeter / Locust / Gatling** from one model | 13, 14–17 |
-| **The Oracle** / **"Temet Nosce" — Know thyself** | The human **VALIDATE** gate — judgment stays human | 18 |
-| **"There is no spoon… it is not the spoon that bends, it is only yourself"** | Don't bend the test to pass; bend the test to match reality | 1, 19, 20 |
+| **"This is the Construct. It's our loading program. We can load anything…"** | The **engine** — loads a runnable world (the test config) from the model | 12, 13 |
+| **"Guns. Lots of guns."** (materialize an arsenal on demand) | Renderers materialize **k6 / JMeter / Locust / Gatling** from one model | 14, 15–18 |
+| **The Oracle** / **"Temet Nosce" — Know thyself** | The human **VALIDATE** gate — judgment stays human | 19 |
+| **"There is no spoon… it is not the spoon that bends, it is only yourself"** | Don't bend the test to pass; bend the test to match reality | 1, 20, 21 |
 
-**Theme discipline (for a sharp audience):** the theme is a thin framing layer. Use it in titles, section turns, and the three discussion beats. In the technical core (slides 5–13) let the numbers carry the weight and let the Matrix line be the *punctuation*, not the argument.
+**Theme discipline (for a sharp audience):** the theme is a thin framing layer. Use it in titles, section turns, and the three discussion beats. In the technical core (slides 5–14) let the numbers carry the weight and let the Matrix line be the *punctuation*, not the argument.
 
 ---
 
@@ -149,20 +154,23 @@ So how do we make this repeatable instead of a one-off heroics project? We give 
 ### Slide 12 — The engine: telemetry in, model out (19:00–21:00)
 *(The Construct slide.)* "This is the Construct. It's our loading program. We can load anything." That's the engine. It's three layers, and the split is deliberate. A backend-specific **input adapter** pulls the raw telemetry — DQL for us, but it could be Tempo, Jaeger, Envoy logs — and normalizes it into one neutral schema. Then the **engine** — completely backend-agnostic, deterministic, offline-testable — turns that neutral telemetry into a workload model: front-end discovery, scenario clustering to about eighty percent coverage, per-scenario load via Little's Law, ramp shaping, dataset sizing. Telemetry in, model out, nothing about Dynatrace or k6 inside it. That determinism is the point — same telemetry, same model, every time.
 
-### Slide 13 — One model, many worlds (21:00–22:30)
-And once you have the model, here's the "guns, lots of guns" moment. *(Neo quote.)* One `workload-model.json`, and a registry of **renderers** materializes it into whatever tool you run: k6, JMeter, Locust, Gatling — all four exist today and all four pass their acceptance tests. Same model, same shape, four weapons. The tool stops being the thing you argue about. The *model* is the asset; the tool is a render target. Let me show you.
+### Slide 13 — Architecture: the stack in our cluster (21:00–21:45)
+Before I run it, thirty seconds on what's actually wired up — because none of this is a slideware diagram, it's running in our cluster right now. *(Walk the arrows.)* The system under test is the **OpenTelemetry Demo** — Astroshop, a frontend and about fifteen microservices, instrumented with OTel. Its telemetry flows out over OTLP to an **OpenTelemetry Collector**, and the Collector ships it to **Dynatrace Grail**. Grail is where the two truths live: the **`spans`** table — the traces — and **RUM**, in `user.sessions` and `user.events`. On top of that sits the part we built: an **agent** that drives a versioned **skill**, which runs the **engine** — DQL in, workload model out — and then the **renderers** that materialize the model into k6 and JMeter. Two honest annotations on this diagram, because this room will look for them: the **logs** leg is drawn dashed — on this tenant the access-log probe comes back empty, so we're spans-and-RUM here, not logs. And the `user.events` arrow is dashed too — that's the scope-gated one, the glitch I'll hit live in a minute. Everything on the read path is **read-only, extraction-only, non-production**. All of this — the engine, the renderers, this exact demo — is in the repo; links are on screen and on the last slide.
 
-### Slides 14–17 — DEMO: load the program (22:30–27:30) — *narration; artifacts owned by C*
-Watch the loading program run. *(Step 1)* Here's the Astroshop workload model — it came out of DQL: spans for the service shape, `user.sessions` for the real journeys, reconciled with that one-point-two-seven factor so the volume matches the unsampled truth. G0 checks are green. *(Step 2)* I hand that one model to the k6 renderer — out comes a k6 project: arrival-rate executor, think-times from the model, and every single request carries `synthetic=true` in baggage so I can find it later. *(Step 3)* Same model, JMeter renderer — out comes a `.jmx`: Concurrency thread group, Throughput Shaping Timer, CSV data sets for cache-busting. *(Step 4)* Put them side by side: same journeys, same weights, same arrival shape — two completely different tools. Guns, lots of guns. I'm running this from committed artifacts, not a live cluster, on purpose — trust the trace, not the demo. *(Fallback if time: narrate steps 1, 2, 4 only; drop JMeter detail.)*
+### Slide 14 — One model, many worlds (21:45–22:45)
+And once you have the model, here's the "guns, lots of guns" moment. *(Neo quote.)* One `workload-model.json`, and a registry of **renderers** materializes it into whatever tool you run: k6, JMeter, Locust, Gatling — all four exist today and all four pass their acceptance tests. Same model, same shape, four weapons. The tool stops being the thing you argue about. The *model* is the asset; the tool is a render target. And I'm not going to tell you it works — I'm going to do it, live, right now.
 
-### Slide 18 — The loop + the Oracle (27:30–29:00)
-Zoom out: the whole thing is a five-stage loop. SCOPE — telemetry to model. VALIDATE — the human gate. SYNTHESIZE — model to test code. EXECUTE — the scoped run, tagged synthetic. ANALYZE — shape-diff against production, and iterate at most three times before it escalates to a human. And VALIDATE is the Oracle. *(Temet Nosce — "know thyself" — on screen.)* The agent can model, generate, run, and diff all day long. But whether *this* scenario is the right thing to test is a human judgment, bound by a hash to the exact model revision — change one field and the approval is void and the gate re-opens. No auto-approval, ever. Not on confidence, not on a similarity score, not on a deadline. That's what "delegate execution, not judgment" means in practice.
+### Slides 15–18 — DEMO: load the program, LIVE (22:45–27:30) — *narration; artifacts owned by C*
+This is the part where I don't trust the demo either — so we build it from scratch, on stage, against the live system. *(Step 0 — one command, `run-demo-live.sh`.)* *"I know kung fu."* *(Step 1 — telemetry → model, live.)* This isn't a model I saved yesterday. Right now it's running DQL against the live Astroshop — `fetch spans` for the service shape, `fetch user.sessions` for the real journeys — and materializing the model from what it sees this second. Watch the numbers land: three hundred thousand-plus frontend root traces, the order split coming out at roughly ninety-nine percent browsers and one percent buyers — *re-derived live, not a constant I typed in* — and sampling ratio one-point-zero, because this tenant is unsampled. The G0 gate runs on those fresh numbers: twelve of twelve, green. *(Step 1, the glitch.)* And there it is — watch the scroll — `fetch user.events` returns **four-oh-three, not authorized**. That's the real glitch in the Matrix. The ordered-journey table needs a storage scope we've asked for and haven't been granted. The extractor catches it and degrades to spans plus `user.sessions` — and nothing in this model depended on `user.events`, so the degrade is lossless. I'm showing you the failure on purpose: trust the trace, not the demo. *(The gate.)* Now the engine stops and asks a human — me — to approve what it just observed. *(Temet Nosce foreshadow.)* It will not synthesize a single request until I do. I approve. *(Step 2 — model → k6.)* *"Show me."* One command, and out of that one approved model comes a k6 project: ramping-arrival-rate executor — an open model — stages scaled straight off the weights, and `synthetic=true` in baggage on every request so I can find my own load later. V2a checks pass. *(Step 3 — model → JMeter.)* Same model, different gun: out comes a `.jmx` — Concurrency Thread Group, Throughput Shaping Timer, CSV data sets for cache-busting. Static checks pass. *(Step 4 — diff.)* Side by side: same journeys, same weights, same arrival envelope, same synthetic baggage — two completely different engines, zero hand-authoring. Guns, lots of guns. The model is the program; the renderer is just the compiler back-end. *(Fallback note for Henrik: if Step 0 reports the tenant unreachable, `run-demo-live.sh` tells you to switch to `run-demo.sh` — a rehearsed recorded run of this identical flow. Narrate it the same way; say once that it's the recorded fallback. If time is short, narrate steps 1, 2, 4 and drop the JMeter detail.)*
 
-### Slide 19 — Honest limits: glitches in the Matrix (29:00–30:00) [FLEX]
-Before I open it up — the glitches I haven't fixed, because an expert room deserves the caveats. One: we extract *and* validate from the same telemetry, so a shared blind spot — async fan-out, websockets, fire-and-forget — is invisible on both sides. We cross-check at least one run against infra metrics, not telemetry alone. Two: mean is not peak; we model mean arrival today and a peak-envelope profile is still on the backlog. Three: the ordered-journey RUM piece is waiting on a storage scope. And the deepest one — there is no spoon. The temptation, always, is to tune the test until the diff turns green. We cap iterations at three and escalate with evidence precisely so we bend the test toward reality, not toward passing.
+### Slide 19 — The loop + the Oracle (27:30–29:00)
+Zoom out: the whole thing is a five-stage loop. SCOPE — telemetry to model. VALIDATE — the human gate. SYNTHESIZE — model to test code. EXECUTE — the scoped run, tagged synthetic. ANALYZE — shape-diff against production, and iterate at most three times before it escalates to a human. And VALIDATE is the Oracle — you just watched it fire, mid-demo, when the engine made me approve the model before it would render anything. *(Temet Nosce — "know thyself" — on screen.)* The agent can model, generate, run, and diff all day long. But whether *this* scenario is the right thing to test is a human judgment, bound by a hash to the exact model revision — change one field and the approval is void and the gate re-opens. No auto-approval, ever. Not on confidence, not on a similarity score, not on a deadline. That's what "delegate execution, not judgment" means in practice.
 
-### 💬 Slide 20 — Discussion #3 + close (30:00 → into Q&A)
-So here's my last question, and then the floor is yours. If you walked out of here and took the red pill on exactly one service — one service you already observe well — which one would you red-pill first, and what's the one number in your current test for it that you've never been able to justify? *(Collect answers; tie back to the folklore from Discussion #1.)* That's the ask. Not "rebuild all your load testing." Pick one service, let the telemetry propose the model, you validate it, render it, run it scoped, diff the shape. One service. Stop guessing. Load the real world. Thank you.
+### Slide 20 — Honest limits: glitches in the Matrix (29:00–30:00) [FLEX]
+Before I open it up — the glitches I haven't fixed, because an expert room deserves the caveats. One: we extract *and* validate from the same telemetry, so a shared blind spot — async fan-out, websockets, fire-and-forget — is invisible on both sides. We cross-check at least one run against infra metrics, not telemetry alone. Two: mean is not peak; we model mean arrival today and a peak-envelope profile is still on the backlog. Three: the ordered-journey RUM piece — you saw it four-oh-three on stage — is waiting on a storage scope. And the deepest one — there is no spoon. The temptation, always, is to tune the test until the diff turns green. We cap iterations at three and escalate with evidence precisely so we bend the test toward reality, not toward passing.
+
+### 💬 Slide 21 — Discussion #3 + close (30:00 → into Q&A)
+So here's my last question, and then the floor is yours. If you walked out of here and took the red pill on exactly one service — one service you already observe well — which one would you red-pill first, and what's the one number in your current test for it that you've never been able to justify? *(Collect answers; tie back to the folklore from Discussion #1.)* That's the ask. Not "rebuild all your load testing." Pick one service, let the telemetry propose the model, you validate it, render it, run it scoped, diff the shape. One service. Everything you just watched — the engine, the renderers, this live demo — is open; the repo and the asset links are on the screen behind me. Stop guessing. Load the real world. Thank you.
 
 ---
 
@@ -255,53 +263,68 @@ So here's my last question, and then the floor is yours. If you walked out of he
 - Same telemetry → same model, every time
 - **Visual:** the 3-layer engine diagram (primary diagram to draw). Construct white-void motif optional behind it. Label determinism.
 
-### Slide 13 — One model, many worlds
+### Slide 13 — Architecture: the stack in our cluster *(rev2 new)*
+- *"This is the Construct…"* — the real wired stack, not slideware
+- Astroshop (OTel Demo: frontend + ~15 services) → **OTel Collector** → **Dynatrace Grail**
+- Grail: `spans` (traces) + RUM (`user.sessions`, `user.events`) — read via **DQL / `dtctl`**
+- **agent → skill → engine (DQL in, model out) → renderers (k6 · JMeter)**
+- **V1 human gate** between extract and render (renderers refuse an unapproved model)
+- read-only · extraction-only · non-production · tenant-isolated
+- **Repo + assets:** `github.com/henrikrexed/AI-Performance-Testing` → `skills/workload-model` (extract+schema+gates) · `skills/{k6,jmeter,locust,gatling}-synthesis` + `skills/renderer-kit` (render) · `skills/loadtest-run` (execute) · `loadtests/wkf10640-astroshop-frontend/` (this demo)
+- **Visual:** the cluster-stack architecture diagram (NEW primary diagram for B). Left→right pipeline. Draw the **logs** leg **dashed** = "unavailable on this tenant (spans-only)"; draw the **`user.events`** edge **dashed/glitch** = "403, scope-gated (ISI-5719)". Mark the **V1 gate** as an explicit lock between engine and renderers. Repo link + QR corner. ⚠ links must resolve in the public mirror before QR goes live (ISI-5659 publication gate).
+
+### Slide 14 — One model, many worlds
 - *"Guns. Lots of guns."*
 - One `workload-model.json`
 - Renderers: **k6 · JMeter · Locust · Gatling** (all pass acceptance tests)
 - The model is the asset; the tool is a render target
-- **Visual:** renderer fan-out diagram — one model → four tool logos. Weapon-rack motif (tasteful). This sets up the demo.
+- **Visual:** renderer fan-out diagram — one model → four tool logos. Weapon-rack motif (tasteful). This sets up the live demo.
 
-### Slides 14–17 — DEMO: load the program *(artifacts owned by C)*
-- 14 — The model (from DQL: spans + `user.sessions`, ×1.27, G0 green)
-- 15 — Model → **k6** (arrival-rate executor, `synthetic=true` baggage)
-- 16 — Model → **JMeter** (Concurrency TG, Throughput Shaping Timer, CSV data sets)
-- 17 — Side by side: same journeys/weights/shape, two tools
-- **Visual:** screen-capture frames from C; keep chrome minimal; a persistent "running from committed artifacts" footer (trust-the-trace honesty). Coordinate exact framing with Observability Agent.
+### Slides 15–18 — DEMO: load the program, LIVE *(artifacts owned by C)*
+- 15 — **Live DQL → model:** `run-demo-live.sh` runs `fetch spans` + `fetch user.sessions` on stage → materializes the model → **G0 12/12**. Live numbers (re-derived, not constants): ~321k root traces, browser ~99% / buyer ~1%, `samplingRatio` 1.0. **No pre-baked model.**
+- 16 — **The glitch:** `fetch user.events` → **403** scrolls by → degrade to spans + `user.sessions` (lossless). Then the **V1 gate** fires — presenter approves, live.
+- 17 — Approved model → **k6** (ramping-arrival-rate, `synthetic=true` baggage) · **JMeter** (Concurrency TG, Throughput Shaping Timer, CSV) — both green
+- 18 — Side by side: same journeys/weights/arrival envelope, two engines, zero hand-authoring
+- **Visual:** live terminal capture (green-on-black); keep chrome minimal. Footer flips from "LIVE — DQL against Astroshop" to a small "recorded fallback" badge only if Henrik switches to `run-demo.sh`. Highlight the **403 line** and the **gate prompt** as on-screen beats. Coordinate exact framing with Observability Agent.
 
-### Slide 18 — The loop + the Oracle
+### Slide 19 — The loop + the Oracle
 - SCOPE → VALIDATE → SYNTHESIZE → EXECUTE → ANALYZE (≤3 iterations, then escalate)
-- VALIDATE = the Oracle. **Temet Nosce — know thyself**
+- VALIDATE = the Oracle (you watched it fire mid-demo). **Temet Nosce — know thyself**
 - Approval is hash-bound to the model revision — change a field, gate re-opens
 - No auto-approval: not confidence, not similarity, not a deadline
 - **Visual:** the 5-stage loop diagram (primary diagram), human gate highlighted as the Oracle. "Temet Nosce" over the gate.
 
-### Slide 19 — Honest limits: glitches in the Matrix
+### Slide 20 — Honest limits: glitches in the Matrix
 - Circular ground truth — extract + validate from same telemetry (cross-check infra metrics) [R5]
 - Mean ≠ peak — peak-envelope profile on backlog [R2]
-- Ordered-journey RUM waiting on `storage:user.events:read`
+- Ordered-journey RUM waiting on `storage:user.events:read` (you saw the 403 live)
 - There is no spoon: don't tune the test green — bend it to reality
 - **Visual:** three "⚠ field notes" cards + a closing "there is no spoon" line. Honest, credible — this slide buys trust with experts.
 
-### Slide 20 — 💬 Discussion #3 + close
+### Slide 21 — 💬 Discussion #3 + close
 - **What would you red-pill first?**
 - One service you already observe — and the one number you can't justify
 - The ask: telemetry proposes → you validate → render → run scoped → diff
+- **It's all open:** `github.com/henrikrexed/AI-Performance-Testing` (methodology + engine + renderers + this demo)
 - **Stop guessing. Load the real world.**
-- **Visual:** red pill, single CTA bar. Code-rain returns (bookend with slide 1). QR to repo.
+- **Visual:** red pill, single CTA bar. Code-rain returns (bookend with slide 1). Repo link + **QR to repo** (same QR as #13). ⚠ QR gated on ISI-5659 public-mirror publication.
 
 ---
 
 # Part 5 — Flags for C (technical fact-check) & open questions
 
+*Note (rev2): C has already rebuilt the live demo + extended the accuracy review to the arch slide under [ISI-5723](/ISI/issues/ISI-5723) rev2 (commit `97913df`; `TECH-ACCURACY-REVIEW.md` §8 arch + §9 live). The items below are reconciled against that review — slide numbers updated for the +1 shift.*
+
 **Please verify (workstream C — Observability Agent):**
-1. **1.27 factor** (slides 10, 14) — confirm `25.94` RUM req/s, `33.03` span req/s, ratio `1.2735`, "~79% captured," and that it needs only `user.sessions` + spans (not `user.events`). Source: `isi5693-session-stitch.md` §8.1 + `merge-plan.json`.
+1. **1.27 factor** (slide 10, Discussion #2) — confirm `25.94` RUM req/s, `33.03` span req/s, ratio `1.2735`, "~79% captured," and that it needs only `user.sessions` + spans (not `user.events`). Source: `isi5693-session-stitch.md` §8.1 + `merge-plan.json`. *(Kept on the reveal slide; the live demo headline is the observed split, not 1.27 — confirm that split is right to present this way.)*
 2. **Head vs tail sampling claim** (slide 6) — confirm my framing of "adjusted count = 1/probability (OTel spec)" and "tail sampling cannot be extrapolated" is accurate and not overstated. Part 2 §2.1 sources.
-3. **`user.events` 403 / scope-gated** (slide 9, 19) — confirm current state is still `missing storage:user.events:read` (per [ISI-5719](/ISI/issues/ISI-5719), re-confirmed 2026-10-12) so we don't claim it live on stage.
+3. **`user.events` 403 / scope-gated** (slides 9, 13, 16, 20) — confirm current state is still `missing storage:user.events:read` (per [ISI-5719](/ISI/issues/ISI-5719)) so the 403 is a reproducible on-stage beat, and the degrade to spans + `user.sessions` is lossless for this demo. (§9 confirms reproducible on cue.)
 4. **35,679 sessions / 5 apps** (slide 9) — confirm still representative of the tenant; it's a 24h snapshot.
-5. **Renderer matrix** (slide 13) — confirm k6 / JMeter / Locust / Gatling all currently pass acceptance tests (memory says yes: ISI-5656/57/58 + k6 done).
+5. **Renderer matrix** (slide 14) — confirm k6 / JMeter / Locust / Gatling all currently pass acceptance tests (memory says yes: ISI-5656/57/58 + k6 done).
 6. **OTel browser/session semconv = "Development"** (slide 7) — confirm wording; and ⚠ confirm the exact **Client-Side Telemetry SIG** name before we name it anywhere.
-7. **G0 12/12 on the Astroshop model** (slide 14) — confirm `loadtests/wkf10640-astroshop-frontend/workload-model.json` is the demo source and still G0-green.
+7. **Live demo numbers** (slides 15–16) — per §9 live run: ~321k frontend root traces, browser ~99% / buyer ~1%, `samplingRatio` 1.0, G0 12/12, k6 V2a + JMeter J1–J7 green. ⚠ **Live volumetrics vary by window** — narration says "what the system is doing right now," not fixed constants; confirm that's the right framing for latency/concurrency/trace-count numbers.
+8. **Architecture slide #13 accuracy** (rev2 new) — confirm the pipeline (Astroshop/OTel Demo → Collector → Grail spans+RUM → agent/skill/engine → renderers) and the two dashed-edge annotations: **logs = unavailable on this tenant (spans-only)**, **`user.events` = 403 scope-gated**. The V1 gate sits between extract and render and is code-enforced. (§8.)
+9. **Repo/asset links** (slides 13, 21) — confirm each path resolves in the public mirror `github.com/henrikrexed/AI-Performance-Testing` **before** the QR/links go on the slide; publication is gated on [ISI-5659](/ISI/issues/ISI-5659). Flag to Graphic Designer (B) not to bake a QR that 404s.
 
 **Open questions for Henrik / board:**
 - OK to **omit the RUM market-size figure** entirely and lead with the Google CrUX field-data point? (Recommended — stronger for this audience.)
@@ -309,6 +332,7 @@ So here's my last question, and then the floor is yours. If you walked out of he
 - Demo (slides 14–17) is **5 min** of a 30-min slot with 3 discussion beats — if the room runs hot on Discussion #2, I've written a fallback to compress the demo to ~3 min (drop JMeter detail). Acceptable?
 
 **Handoff status:**
-- Outline already posted to ISI-5722 for **B (UXDesigner)** — visual system + diagram list.
+- Outline already posted to ISI-5722 for **B (UXDesigner)** — visual system + diagram list. **rev2 adds one primary diagram for B:** the slide-#13 cluster-stack architecture diagram (left→right pipeline, dashed logs + dashed `user.events` glitch edges, explicit V1 gate lock, repo/QR corner).
 - This document = the full narrative + per-slide copy + research for **B to lay out** and **C to fact-check**.
 - Theme locked; every themed line maps to a technical claim (Part 1 table).
+- **rev2 delta (2026-10-13):** new slide #13 (architecture); demo (15–18) rewritten as **full live e2e** matching [ISI-5723](/ISI/issues/ISI-5723) `run-demo-live.sh` (live DQL → model → V1 gate → k6+JMeter), the `user.events` 403 narrated as a reproducible "glitch," recorded fallback flagged; repo/asset links on #13 and #21; all slides after 12 shifted +1 (now 21 slides).
