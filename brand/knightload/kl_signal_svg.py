@@ -15,9 +15,27 @@ NIGHT_TOP, NIGHT_BOT = "#14162A", "#22305A"
 
 RK_STEM = (0.17, 0.13, 0.30, 0.87)
 RK_LEG = [(0.30, 0.52), (0.70, 0.87), (0.84, 0.87), (0.44, 0.50)]
-RK_RAMP = [(0.345, 0.545), (0.82, 0.115), (0.885, 0.205), (0.405, 0.575)]
 JUNCTION = (0.375, 0.56)
 TIP = (0.85, 0.16)
+# ramp-up = ascending graph-bar chart (board feedback)
+RK_BARS_N = 5
+RK_BARS_X0 = 0.31
+RK_BARS_W = 0.072
+RK_BARS_BASE = 0.57
+RK_BARS_TOP_HI, RK_BARS_TOP_LO = 0.49, 0.115
+
+
+def _bar_rects(frac):
+    step = (0.86 - RK_BARS_X0 - RK_BARS_W) / (RK_BARS_N - 1)
+    out = []
+    for i in range(RK_BARS_N):
+        t = i / (RK_BARS_N - 1)
+        bx = RK_BARS_X0 + i * step
+        top = RK_BARS_TOP_HI + (RK_BARS_TOP_LO - RK_BARS_TOP_HI) * t
+        x0, y0 = _map(frac, bx, top)
+        x1, y1 = _map(frac, bx + RK_BARS_W, RK_BARS_BASE)
+        out.append((x0, y0, x1 - x0, y1 - y0))
+    return out
 
 
 def _map(frac, lx, ly):
@@ -37,10 +55,15 @@ def k_shapes(frac, base, ramp, draw_ramp=True, glow=False):
            f'rx="{0.03*tile:.1f}" fill="{base}"/>']
     out.append(f'<polygon points="{_polystr([_map(frac,*p) for p in RK_LEG])}" fill="{base}"/>')
     if draw_ramp:
-        rp = _polystr([_map(frac, *p) for p in RK_RAMP])
+        bars = _bar_rects(frac)
+        rad = 0.012 * tile
+        def bar(x, y, w, h, extra=""):
+            return (f'<rect x="{x:.1f}" y="{y:.1f}" width="{w:.1f}" height="{h:.1f}" '
+                    f'rx="{rad:.1f}" fill="{ramp}" {extra}/>')
         if glow:
-            out.append(f'<polygon points="{rp}" fill="{ramp}" filter="url(#glow)" opacity="0.6"/>')
-        out.append(f'<polygon points="{rp}" fill="{ramp}"/>')
+            out.append('<g filter="url(#glow)" opacity="0.6">'
+                       + "".join(bar(*b) for b in bars) + '</g>')
+        out.extend(bar(*b) for b in bars)
     return "".join(out)
 
 

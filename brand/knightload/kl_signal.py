@@ -140,23 +140,49 @@ def _pl(frac, lx, ly, W):
     return (o + lx * tile, o + ly * tile)
 
 
+# ramp-up rendered as an ASCENDING GRAPH BAR CHART (board feedback): the K's
+# upper arm becomes 5 bars climbing up-right on a common baseline (throughput ramp).
+RK_BARS_N = 5
+RK_BARS_X0 = 0.31
+RK_BARS_W = 0.072
+RK_BARS_BASE = 0.57
+RK_BARS_TOP_HI, RK_BARS_TOP_LO = 0.49, 0.115  # shortest -> tallest top-y
+
+
+def _bar_rects(frac, W):
+    step = (0.86 - RK_BARS_X0 - RK_BARS_W) / (RK_BARS_N - 1)
+    rects = []
+    for i in range(RK_BARS_N):
+        t = i / (RK_BARS_N - 1)
+        bx = RK_BARS_X0 + i * step
+        top = RK_BARS_TOP_HI + (RK_BARS_TOP_LO - RK_BARS_TOP_HI) * t
+        x0, y0 = _pl(frac, bx, top, W)
+        x1, y1 = _pl(frac, bx + RK_BARS_W, RK_BARS_BASE, W)
+        rects.append((x0, y0, x1, y1))
+    return rects
+
+
 def _draw_rampK(img, W, frac, base, ramp, draw_ramp=True, glow_col=None):
-    """Draw the two-tone Ramp-K. stem+leg in `base`, ascending ramp in `ramp`
-    (optionally with a soft glow). Returns (junction_px, tip_px)."""
+    """Draw the two-tone Ramp-K. stem+leg in `base`; the ascending ramp is a
+    GRAPH BAR CHART in `ramp` (optional glow). Returns (junction_px, tip_px)."""
     d = ImageDraw.Draw(img)
     x0, y0 = _pl(frac, RK_STEM[0], RK_STEM[1], W)
     x1, y1 = _pl(frac, RK_STEM[2], RK_STEM[3], W)
     d.rounded_rectangle([x0, y0, x1, y1], radius=0.03 * frac * W, fill=base + (255,))
     d.polygon([_pl(frac, p[0], p[1], W) for p in RK_LEG], fill=base + (255,))
-    ramp_px = [_pl(frac, p[0], p[1], W) for p in RK_RAMP]
     if draw_ramp:
+        rects = _bar_rects(frac, W)
+        rad = 0.012 * frac * W
         if glow_col is not None:
             gl = Image.new("RGBA", (W, W), (0, 0, 0, 0))
-            ImageDraw.Draw(gl).polygon(ramp_px, fill=glow_col + (150,))
-            gl = gl.filter(ImageFilter.GaussianBlur(radius=int(W * 0.018)))
+            gd = ImageDraw.Draw(gl)
+            for r in rects:
+                gd.rounded_rectangle(list(r), radius=rad, fill=glow_col + (150,))
+            gl = gl.filter(ImageFilter.GaussianBlur(radius=int(W * 0.016)))
             img.alpha_composite(gl)
             d = ImageDraw.Draw(img)
-        d.polygon(ramp_px, fill=ramp + (255,))
+        for r in rects:
+            d.rounded_rectangle(list(r), radius=rad, fill=ramp + (255,))
     return _pl(frac, *RK_JUNCTION, W), _pl(frac, *RK_TIP, W)
 
 
