@@ -36,6 +36,7 @@ EXCLUDES=(
   ".isi5735-pending"      # patch/bundle staging for the working repo
   "SCRUB-REPORT.md"       # references internal ISI ids / scrub provenance
   "tools/publish-fresh-history.sh"  # this internal publish tool is not a public artifact
+  "tools/.secret-scan-internal"     # internal-pattern overlay — would publish the strings we scrub
   "__pycache__"
   ".pytest_cache"
 )
@@ -77,8 +78,16 @@ fi
 
 # ---- secret scan (fail closed) ---------------------------------------------
 SCAN="$STAGE/tools/secret-scan.sh"
+# The internal-pattern overlay is NOT in the staged tree (it must never ship), so
+# point the scanner at the SRC copy. This makes the gate catch internal strings in
+# the content being published even though the overlay itself is excluded from it.
+export SECRET_SCAN_INTERNAL="$SRC/tools/.secret-scan-internal"
 if [ -x "$SCAN" ] || [ -f "$SCAN" ]; then
-  echo "running secret-scan on staged tree..."
+  echo "running secret-scan on staged tree (internal overlay: $SECRET_SCAN_INTERNAL)..."
+  if [ ! -f "$SECRET_SCAN_INTERNAL" ]; then
+    echo "ABORT: internal-pattern overlay missing ($SECRET_SCAN_INTERNAL) — refusing to publish without the internal-name gate." >&2
+    exit 1
+  fi
   if ! bash "$SCAN"; then
     echo "ABORT: secret-scan failed on the staged tree — nothing published." >&2
     exit 1
