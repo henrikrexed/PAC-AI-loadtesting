@@ -422,23 +422,18 @@ def d5_stack():
     text_c(d, (90+W-640)//2, by+46, "read-only  ·  extraction-only  ·  non-production  ·  tenant-isolated",
            font("mono", 28, bold=True), fill=T.GREEN)
 
-    # repo + QR placeholder (NOT a live QR — gated on ISI-5659 publication)
+    # repo + REAL QR — public mirror is live (ISI-5659 published; repo resolves 200)
+    from qr_util import draw_qr, REPO_URL
     qb = [W-540, by-44, W-150, by+134]
     panel(d, qb, fill=T.BG2, outline=T.LINE2, width=2)
-    import random as _r
-    rr = _r.Random(5)
-    qx0, qy0 = qb[0]+205, qb[1]+22
-    cells = 13; cs = 11
-    for yi in range(cells):
-        for xi in range(cells):
-            if rr.random() > 0.5:
-                d.rectangle([qx0+xi*cs, qy0+yi*cs, qx0+xi*cs+cs-1, qy0+yi*cs+cs-1], fill=T.FAINT)
+    qsize = draw_qr(d, (qb[2]-168, qb[1]+14), 150, url=REPO_URL,
+                    dark=T.INK, light=(6, 9, 7))
     text_l(d, (qb[0]+24, qb[1]+20), "repo", font("mono", 24, bold=True), fill=T.INK)
     text_l(d, (qb[0]+24, qb[1]+56), "github.com/", font("mono", 18), fill=T.MUTE)
     text_l(d, (qb[0]+24, qb[1]+80), "henrikrexed/", font("mono", 18), fill=T.MUTE)
     text_l(d, (qb[0]+24, qb[1]+104), "AI-Performance-", font("mono", 18), fill=T.GREEN)
     text_l(d, (qb[0]+24, qb[1]+128), "Testing", font("mono", 18), fill=T.GREEN)
-    text_c(d, (qb[0]+qb[2])//2, qb[3]+24, "QR placeholder — pending public mirror (ISI-5659)", font("mono", 18), fill=T.AMBER)
+    text_c(d, (qb[0]+qb[2])//2, qb[3]+24, "scan → live public mirror (ISI-5659)", font("mono", 18), fill=T.GREEN_DIM)
 
     export(img, "d5-stack")
 
