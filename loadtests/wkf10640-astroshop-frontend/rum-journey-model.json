@@ -1,0 +1,330 @@
+{
+  "source": {
+    "tenant": "wkf10640",
+    "app": "Astroshop",
+    "object": "user.events",
+    "windowHours": 24,
+    "sessions": 18773,
+    "scope": "storage:user.events:read (granted 2026-10-13)",
+    "rumSpanJoinKey": "trace.id / span.id present on request events"
+  },
+  "journeyTemplates": [
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/cart/checkout/:uuid:"
+      ],
+      "sessions": 15588,
+      "weight": 0.8306,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/",
+        "/product/:id:",
+        "/cart"
+      ],
+      "sessions": 2482,
+      "weight": 0.1322,
+      "steps": 6
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/",
+        "/product/:id:"
+      ],
+      "sessions": 408,
+      "weight": 0.0217,
+      "steps": 5
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/",
+        "/cart",
+        "/product/:id:",
+        "/cart",
+        "/cart/checkout/:uuid:"
+      ],
+      "sessions": 171,
+      "weight": 0.0091,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/",
+        "/cart",
+        "/product/:id:",
+        "/cart"
+      ],
+      "sessions": 56,
+      "weight": 0.003,
+      "steps": 6
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:"
+      ],
+      "sessions": 22,
+      "weight": 0.0012,
+      "steps": 2
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/"
+      ],
+      "sessions": 13,
+      "weight": 0.0007,
+      "steps": 4
+    },
+    {
+      "sequence": [
+        "/"
+      ],
+      "sessions": 10,
+      "weight": 0.0005,
+      "steps": 1
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/",
+        "/cart",
+        "/product/:id:"
+      ],
+      "sessions": 9,
+      "weight": 0.0005,
+      "steps": 5
+    },
+    {
+      "sequence": [
+        "/",
+        "/"
+      ],
+      "sessions": 2,
+      "weight": 0.0001,
+      "steps": 2
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/product/:id:",
+        "/",
+        "/cart"
+      ],
+      "sessions": 2,
+      "weight": 0.0001,
+      "steps": 6
+    },
+    {
+      "sequence": [
+        "/cart",
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/cart/checkout/:uuid:"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 5
+    },
+    {
+      "sequence": [
+        "/product/:id:",
+        "/cart",
+        "/cart/checkout/:uuid:"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 3
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/",
+        "/product/:id:",
+        "/cart/checkout/:uuid:",
+        "/cart"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/",
+        "/product/:id:",
+        "/cart",
+        "/product/:id:",
+        "/",
+        "/cart",
+        "/cart/checkout/:uuid:"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 7
+    },
+    {
+      "sequence": [
+        "/cart",
+        "/cart/checkout/:uuid:"
+      ],
+      "sessions": 1,
+      "weight": 0.0001,
+      "steps": 2
+    }
+  ],
+  "thinkTimeByPage": {
+    "/": {
+      "n": 37502,
+      "p50Ms": 1772.6,
+      "p90Ms": 3869.1,
+      "p99Ms": 12255.3,
+      "meanMs": 2368.8,
+      "maxMs": 31213.0
+    },
+    "/product/:id:": {
+      "n": 37484,
+      "p50Ms": 988.3,
+      "p90Ms": 2350.6,
+      "p99Ms": 5590.8,
+      "meanMs": 3589.2,
+      "maxMs": 65277.0
+    },
+    "/cart": {
+      "n": 37044,
+      "p50Ms": 1431.3,
+      "p90Ms": 2829.0,
+      "p99Ms": 6682.2,
+      "meanMs": 1304.5,
+      "maxMs": 22315.0
+    },
+    "/cart/checkout/:uuid:": {
+      "n": 15763,
+      "p50Ms": 831.1,
+      "p90Ms": 988.3,
+      "p99Ms": 1397.7,
+      "meanMs": 3045.0,
+      "maxMs": 4643.0
+    }
+  },
+  "perEndpointMerge": {
+    "entries": [
+      {
+        "key": "/api/images/:file:",
+        "source": "rum",
+        "rumRate": 11.090405,
+        "spanRate": 11.736933,
+        "extrapolationFactor": 1.0583,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0583 to the unsampled span-observed volume (11.7369/s)."
+      },
+      {
+        "key": "/api/cart",
+        "source": "rum",
+        "rumRate": 1.608368,
+        "spanRate": 2.066412,
+        "extrapolationFactor": 1.2848,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.2848 to the unsampled span-observed volume (2.06641/s)."
+      },
+      {
+        "key": "/api/recommendations",
+        "source": "rum",
+        "rumRate": 1.872627,
+        "spanRate": 2.035463,
+        "extrapolationFactor": 1.087,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.087 to the unsampled span-observed volume (2.03546/s)."
+      },
+      {
+        "key": "/api/data",
+        "source": "rum",
+        "rumRate": 1.314688,
+        "spanRate": 1.445799,
+        "extrapolationFactor": 1.0997,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0997 to the unsampled span-observed volume (1.4458/s)."
+      },
+      {
+        "key": "/api/shipping",
+        "source": "rum",
+        "rumRate": 0.740648,
+        "spanRate": 0.781273,
+        "extrapolationFactor": 1.0549,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.0549 to the unsampled span-observed volume (0.781273/s)."
+      },
+      {
+        "key": "/api/products",
+        "source": "rum",
+        "rumRate": 0.651019,
+        "spanRate": 0.742905,
+        "extrapolationFactor": 1.1411,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.1411 to the unsampled span-observed volume (0.742905/s)."
+      },
+      {
+        "key": "/api/products/:id:",
+        "source": "rum",
+        "rumRate": 2.521377,
+        "spanRate": 0.510532,
+        "extrapolationFactor": 0.2025,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d70.2025 to the unsampled span-observed volume (0.510532/s)."
+      },
+      {
+        "key": "/api/currency",
+        "source": "rum",
+        "rumRate": 0.217083,
+        "spanRate": 0.409086,
+        "extrapolationFactor": 1.8845,
+        "rationale": "common: RUM user-session primary; scale RUM rate \u00d71.8845 to the unsampled span-observed volume (0.409086/s)."
+      },
+      {
+        "key": "/api/checkout",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.25022,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      },
+      {
+        "key": "/api/cart/invalid-chaos-endpoint",
+        "source": "span",
+        "rumRate": null,
+        "spanRate": 0.007234,
+        "extrapolationFactor": null,
+        "rationale": "no RUM match \u2192 span-order HTTP scenario (tiers 2a/2b)."
+      }
+    ],
+    "summary": {
+      "keys": 10,
+      "rumPrimaryKeys": 8,
+      "spanFallbackKeys": 2,
+      "droppedRumOnlyKeys": 0,
+      "rumDrivenShare": 0.9871,
+      "meanExtrapolationFactor": 1.1016,
+      "extrapolationFactorRange": [
+        0.2025,
+        1.8845
+      ]
+    }
+  }
+}
