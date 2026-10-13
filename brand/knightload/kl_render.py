@@ -43,33 +43,49 @@ def wordmark(d, xy, px, color, tracking_frac=0.06, text="Knightload"):
                           tracking=px * tracking_frac)
 
 
+def _twotone_width(d, fnt, trk):
+    w_k = sum(d.textlength(c, font=fnt) for c in "Knight") + trk * 5
+    w_l = sum(d.textlength(c, font=fnt) for c in "load") + trk * 3
+    return w_k, w_l, w_k + trk + w_l
+
+
 def lockup_horizontal(concept_key, fn, size=(1200, 400), bg=INDIGO1,
-                      silh=SILVER, accent=CYAN, two_tone=True):
-    """Icon on the left, 'Knightload' wordmark on the right, baseline-aligned."""
+                      silh=SILVER, accent=CYAN, tagline=True):
+    """Icon left, two-tone 'Knightload' wordmark right. Auto-fits so it never
+    clips: the wordmark point-size is reduced until icon+gap+wordmark fit W."""
     W, H = size
     img = Image.new("RGBA", (W, H), bg + (255,) if bg else (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
-    # icon
-    ic = 236
-    mark = fn(ic, silh=silh, accent=accent) if fn is not k.mark_knight \
-        else fn(ic, silh=silh, accent=accent)
-    iy = (H - ic) // 2
-    ix = 70
-    img.alpha_composite(mark, (ix, iy))
-    # wordmark — draw 'Knight' in silver and 'load' in accent (two-tone)
-    px = 150
+    ix = int(H * 0.10)
+    ic = int(H * 0.60)
+    gap = int(H * 0.11)
+    rmargin = int(H * 0.10)
+    show_tag = tagline and H >= 220
+    # auto-fit the wordmark to the remaining width
+    avail = W - (ix + ic + gap) - rmargin
+    px = int(H * 0.40)
+    trkf = 0.02
+    while px > 8:
+        fnt = k.font(px, bold=True)
+        _, _, total = _twotone_width(d, fnt, px * trkf)
+        if total <= avail:
+            break
+        px -= 2
     fnt = k.font(px, bold=True)
-    tx = ix + ic + 60
-    ty = H // 2 - px * 0.62
-    if two_tone:
-        w1 = k.tracked_text(d, (tx, ty), "Knight", fnt, silh + (255,), tracking=px * 0.03)
-        k.tracked_text(d, (tx + w1 + px * 0.03, ty), "load", fnt, accent + (255,), tracking=px * 0.03)
-    else:
-        k.tracked_text(d, (tx, ty), "Knightload", fnt, silh + (255,), tracking=px * 0.03)
-    # tagline
-    tfnt = k.font(34, bold=False)
-    d.text((tx + 4, ty + px + 18), "Stop guessing. Load with proof.",
-           font=tfnt, fill=k.MUTE + (255,))
+    trk = px * trkf
+    w_k, w_l, total = _twotone_width(d, fnt, trk)
+    # vertical layout: center icon; nudge wordmark block up a touch if tagline shown
+    iy = (H - ic) // 2
+    img.alpha_composite(fn(ic, silh=silh, accent=accent), (ix, iy))
+    tx = ix + ic + gap
+    block_h = px + (int(H * 0.11) if show_tag else 0)
+    ty = (H - block_h) // 2 - int(px * 0.12)
+    w1 = k.tracked_text(d, (tx, ty), "Knight", fnt, silh + (255,), tracking=trk)
+    k.tracked_text(d, (tx + w1 + trk, ty), "load", fnt, accent + (255,), tracking=trk)
+    if show_tag:
+        tfnt = k.font(max(18, int(px * 0.22)), bold=False)
+        d.text((tx + 4, ty + px + int(H * 0.03)), "Stop guessing. Load with proof.",
+               font=tfnt, fill=k.MUTE + (255,))
     return img
 
 

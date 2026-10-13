@@ -1,17 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="256" height="256" role="img" aria-label="Knightload — Chess Knight Sparkline mark">
-  <title>Knightload — Concept B: Chess Knight Sparkline</title>
-  <!-- chess-knight head + neck, facing left -->
-  <polygon points="54.5,11.5 45.5,17.5 37.5,25.5 30.5,31.5 23.5,36 19.5,42 22.5,47 30,49.5 35.5,52 39.5,60 42,70 41.5,80 36,80 33,88.5 69,88.5 66,80 58.5,80 60,56 59,30 60,17.5 56,9.5"
-           fill="#C7CDD6"/>
-  <!-- mane = ascending bars (sparkline) up the back of the neck -->
-  <g fill="#2EE6D6">
-    <rect x="58.5" y="71.71" width="4.5" height="7.16" rx="0.6"/>
-    <rect x="58.5" y="62.29" width="6.5" height="7.16" rx="0.6"/>
-    <rect x="58.5" y="52.87" width="8.5" height="7.16" rx="0.6"/>
-    <rect x="58.5" y="43.45" width="10.5" height="7.16" rx="0.6"/>
-    <rect x="58.5" y="34.03" width="8.5" height="7.16" rx="0.6"/>
-    <rect x="58.5" y="24.61" width="6.0" height="7.16" rx="0.6"/>
-  </g>
-  <!-- eye -->
-  <circle cx="36" cy="33" r="2" fill="#1A1A2E"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="512" height="512" role="img" aria-label="Knightload — Chess Knight Sparkline">
+  <title>Knightload — Chess Knight Sparkline</title>
+  <style>:root{--silh:#C7CDD6;--accent:#2EE6D6;--indigo:#16213E;}</style>
+  <polygon points="545.00,115.00 455.00,175.00 375.00,255.00 305.00,315.00 235.00,360.00 195.00,420.00 225.00,470.00 300.00,495.00 355.00,520.00 395.00,600.00 420.00,700.00 415.00,800.00 360.00,800.00 330.00,885.00 690.00,885.00 660.00,800.00 585.00,800.00 600.00,560.00 590.00,300.00 600.00,175.00 560.00,95.00" fill="var(--silh)" />
+  <rect x="585.00" y="717.13" width="45.00" height="71.57" rx="6.00" fill="var(--accent)"/><rect x="585.00" y="622.97" width="65.00" height="71.57" rx="6.00" fill="var(--accent)"/><rect x="585.00" y="528.80" width="85.00" height="71.57" rx="6.00" fill="var(--accent)"/><rect x="585.00" y="434.63" width="105.00" height="71.57" rx="6.00" fill="var(--accent)"/><rect x="585.00" y="340.47" width="85.00" height="71.57" rx="6.00" fill="var(--accent)"/><rect x="585.00" y="246.30" width="60.00" height="71.57" rx="6.00" fill="var(--accent)"/>
+  <circle cx="360.00" cy="330.00" r="20.00" fill="var(--indigo)"/>
 </svg>
