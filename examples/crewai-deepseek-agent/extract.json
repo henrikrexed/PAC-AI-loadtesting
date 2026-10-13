@@ -1,0 +1,96 @@
+{
+  "_comment": "Worked example extract for the workload-model engine (SCOPE stage). These are the telemetry-derived facts of a CrewAI + DeepSeek agent app observed over one clean, deploy-free load window — the behavioral split comes from whether a turn invokes a tool (ReAct loop) or stays pure-LLM. This file is the generic `extract.json` contract the engine consumes; see docs/engine.md. Run: `workload-engine --extract examples/crewai-deepseek-agent/extract.json --out out --mode agentic` (exit 0 iff the G0 gate passes). Every field below was derived from server spans over the window; no production PII.",
+
+  "name": "crewai-deepseek-agent",
+  "targetService": "crewai-deepseek-agent",
+  "environment": "agent-demo",
+  "generatedAt": "2026-01-01T00:00:00Z",
+  "timeframe": "25m33s deploy-free/incident-free constant-arrival load window",
+  "timeframeNotes": "single-service agent app; entry scoped to the agent service, co-tenant services dropped by scope",
+  "windowSeconds": 1533,
+
+  "accessLogAvailability": "unavailable",
+  "samplingRatio": 1.0,
+  "dqlRunLive": true,
+  "arrivalModel": "open",
+
+  "queries": [
+    "fetch spans | filter is_root_span && service.name=='crewai-deepseek-agent' | summarize count() by entryOp  (front-end discovery -> single entry request)",
+    "fetch logs | filter k8s.container.name=='istio-proxy' over window -> 0 lines  (access-log probe, spans-only)",
+    "fetch spans | join [spans|sort start_time asc|summarize collectArray(span.name) by trace.id] on trace.id  (JOURNEY reconstruction: ReAct loop vs single LLM round)",
+    "fetch spans | summarize countIf(span.name=='execute_tool') by trace.id | summarize count() by usesTool  (archetype split via tool-use terminal signal)",
+    "fetch spans | filter span.name=='agent.turn' | summarize percentile(duration,50/95/99),avg by usesTool  (per-archetype baseline)",
+    "fetch spans | filter request | summarize count() by bin(start_time,1m)  (G3-B arrival curve; interior CoV 0.016 -> steady)",
+    "fetch spans | filter span.name=='agent.turn' | summarize sum(duration) / window  (observed concurrency)"
+  ],
+
+  "coverage": 1.0,
+
+  "arrival": {
+    "arrivalRateTps": 0.1964,
+    "meanServerResponseMs": 2282,
+    "observedConcurrency": 0.4482,
+    "_note": "observedConcurrency = busy-time integral sum(agent.turn duration)/window; meanServerResponseMs is the server span, not the load-driver wrapper"
+  },
+
+  "perMinuteCounts": [11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
+
+  "archetypes": [
+    {
+      "id": "conversational",
+      "behavior": "conversational",
+      "name": "Conversational — pure-LLM turn (single round); no tool",
+      "description": "Conversational — pure-LLM turn (single round); no tool. Reconstructed flow: request -> agent.turn -> llm.call -> chat -> finalize -> message.sent",
+      "weight": 0.6811,
+      "entrypoint": "crewai-deepseek-agent/request",
+      "codeRef": "deploy/agentapp/app/main.py#handle_request",
+      "evidenceSource": "span",
+      "baseline": {"p50Ms": 1235, "p95Ms": 1787, "p99Ms": 16350, "errorRate": 0.0},
+      "steps": [
+        {"id": "s1", "service": "crewai-deepseek-agent", "operation": "POST /request", "callType": "http", "codeRef": "deploy/agentapp/app/main.py#handle_request", "evidenceSource": "span", "payloadRef": "prompt_chat"},
+        {"id": "s2", "service": "crewai-deepseek-agent", "operation": "llm.call (deepseek-chat via LiteLLM)", "callType": "http", "codeRef": "deploy/agentapp/app/agent.py#TracedLLM.call", "evidenceSource": "span"}
+      ]
+    },
+    {
+      "id": "agentic",
+      "behavior": "agentic",
+      "name": "Agentic — tool-using turn (ReAct: LLM -> tool -> LLM); reaches execute_tool",
+      "description": "Agentic — tool-using turn (ReAct: LLM -> tool -> LLM). Reconstructed flow: request -> agent.turn -> llm.call -> chat -> execute_tool(web_search|calculator) -> llm.call -> chat -> finalize -> message.sent",
+      "weight": 0.3189,
+      "entrypoint": "crewai-deepseek-agent/request",
+      "codeRef": "deploy/agentapp/app/main.py#handle_request",
+      "evidenceSource": "span",
+      "baseline": {"p50Ms": 3338, "p95Ms": 6072, "p99Ms": 35061, "errorRate": 0.0},
+      "steps": [
+        {"id": "s1", "service": "crewai-deepseek-agent", "operation": "POST /request", "callType": "http", "codeRef": "deploy/agentapp/app/main.py#handle_request", "evidenceSource": "span", "payloadRef": "prompt_agentic"},
+        {"id": "s2", "service": "crewai-deepseek-agent", "operation": "llm.call (deepseek-chat via LiteLLM)", "callType": "http", "codeRef": "deploy/agentapp/app/agent.py#TracedLLM.call", "evidenceSource": "span"}
+      ]
+    }
+  ],
+
+  "payloads": {
+    "prompt_agentic": {
+      "fields": [
+        {"name": "task", "type": "string", "generator": "const", "values": ["search the web for the latest OTel release and summarize", "calculate the 95th percentile of these latencies"], "distribution": "weighted"}
+      ],
+      "seed": 42
+    },
+    "prompt_chat": {
+      "fields": [
+        {"name": "task", "type": "string", "generator": "const", "values": ["explain distributed tracing in one paragraph", "what is Little's Law"], "distribution": "uniform"}
+      ],
+      "seed": 42
+    }
+  },
+
+  "caps": {"maxRps": 2, "maxVus": 20, "maxDuration": "30m"},
+
+  "exclusions": "none within service scope — all entry traces are application traffic",
+  "targetEnv": "non-production agent-demo namespace (production forbidden without explicit approval)",
+  "abortNote": "Abort ABOVE the agentic tail: tool-using turns reach p99 35061 ms (ReAct + 2nd LLM round) vs conversational p99 16350 ms — set p95 abort > 8000 ms, errorRate abort 5%.",
+  "risks": [
+    "**Behavioral split via a terminal-action signal.** Archetypes are distinguished by whether the flow reaches a tool-invocation span (ReAct) vs stays pure-LLM — the same agnostic classifier the commerce example uses with an order-terminal signal (payment/checkout).",
+    "**Arrival is STEADY.** The driver is constant-arrival-rate; the interior per-minute CoV is 0.016, so the model emits one steady stage + a mandatory ramp-down tail (R2: still mean arrival, no production diurnal envelope).",
+    "**Tool-using turns are ~2.3x heavier** (mean 3714 ms vs 1611 ms) — modeled as separate baselines so a load test exercises both the cheap conversational path and the expensive ReAct path at their true ~32/68 mix."
+  ]
+}
