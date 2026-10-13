@@ -1,0 +1,21 @@
+# Working-repo .gitignore guard (ISI-5759, child of ISI-5743 plan §8).
+# Belt-and-suspenders: keep internal-only content out of accidental stages/pushes.
+# NOTE: this is the INTERNAL working repo. The PUBLIC repo gets its own
+# .gitignore under ISI-5756 and is built by explicit construction, not by
+# excluding these paths. Files already committed here stay tracked; these
+# patterns block NEW untracked content from being staged by accident.
+
+# Internal-only content directories
+presentation/
+presentation-matrix/
+loadtests/
+research/
+exports/
+
+# Python / tooling caches (never commit)
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*cache*/
