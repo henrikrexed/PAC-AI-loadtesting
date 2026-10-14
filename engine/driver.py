@@ -284,11 +284,11 @@ def run_guided(args, build_fn) -> int:
     }}
 
     # --- Step 1: propose ---
-    extract = json.loads(Path(args.extract).read_text())
+    extract = json.loads(Path(args.extract).read_text(encoding="utf-8"))
     model, proposal = build_fn(extract, args.mode)
     model_path = out_dir / "workload-model.json"
-    model_path.write_text(json.dumps(model, indent=2) + "\n")
-    (out_dir / "scenario-proposal.md").write_text(proposal)
+    model_path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "scenario-proposal.md").write_text(proposal, encoding="utf-8")
     print("=" * 72)
     print("STEP 1/4 — PROPOSE  (engine built the model; read & confirm)")
     print("=" * 72)
@@ -303,11 +303,11 @@ def run_guided(args, build_fn) -> int:
     # --- Step 1 gate: confirm (the V1 human gate, revision-bound) ---
     if not _confirm(args.yes):
         state["steps"]["2_confirm"] = {"approved": False}
-        (out_dir / "guided-state.json").write_text(json.dumps(state, indent=2) + "\n")
+        (out_dir / "guided-state.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
         print("\nNot approved — stopping before SYNTHESIZE. No requests will be generated.")
         return 3
     rev, h = bind_approval(model, by=args.by, at=args.at)
-    model_path.write_text(json.dumps(model, indent=2) + "\n")
+    model_path.write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
     print(f"\nSTEP 1 gate ✓ — approved rev {rev}, bound to {h[:19]}… (renderers fail closed without this).")
     state["steps"]["2_confirm"] = {"approved": True, "revision": rev, "hash": h, "by": args.by}
 
@@ -344,7 +344,7 @@ def run_guided(args, build_fn) -> int:
     else:
         state["steps"]["5_try"] = _smoke(out_dir)
 
-    (out_dir / "guided-state.json").write_text(json.dumps(state, indent=2) + "\n")
+    (out_dir / "guided-state.json").write_text(json.dumps(state, indent=2) + "\n", encoding="utf-8")
     print(f"\nguided flow complete → {out_dir / 'guided-state.json'}")
     return 0
 

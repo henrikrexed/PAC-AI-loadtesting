@@ -190,7 +190,25 @@ def _run_guided(sub_argv: list[str]) -> int:
     return driver.run_guided(args, build)
 
 
+def _force_utf8_io() -> None:
+    """Make stdout/stderr UTF-8 regardless of the host console encoding.
+
+    The engine prints and writes non-ASCII glyphs (``→ ≈ ✓ § — …``) that are not
+    representable in the Windows ANSI code page (cp1252), so an un-pinned console
+    would raise ``UnicodeEncodeError`` on a Windows runner — exactly what sank the
+    release smoke. Every file write already pins ``encoding="utf-8"``; this pins
+    the two standard streams to match (idempotent, no-op where already UTF-8)."""
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            try:
+                reconfigure(encoding="utf-8")
+            except (ValueError, OSError):
+                pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_io()
     argv = list(sys.argv[1:] if argv is None else argv)
     if argv and argv[0] == "init":
         return _run_init(argv[1:])
@@ -212,13 +230,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     args = ap.parse_args(argv)
 
-    extract = json.loads(Path(args.extract).read_text())
+    extract = json.loads(Path(args.extract).read_text(encoding="utf-8"))
     model, proposal = build(extract, args.mode)
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "workload-model.json").write_text(json.dumps(model, indent=2) + "\n")
-    (out_dir / "scenario-proposal.md").write_text(proposal)
+    (out_dir / "workload-model.json").write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
+    (out_dir / "scenario-proposal.md").write_text(proposal, encoding="utf-8")
 
     gate = evaluate_g0(
         model,

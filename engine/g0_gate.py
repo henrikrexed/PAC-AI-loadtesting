@@ -62,7 +62,7 @@ class GateResult:
 
 
 def load_schema() -> dict[str, Any]:
-    return json.loads(_SCHEMA_PATH.read_text())
+    return json.loads(_SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
 def evaluate_g0(
@@ -202,7 +202,7 @@ if __name__ == "__main__":  # CLI: python g0_gate.py <model.json> [proposal.md]
     import sys
 
     model_path = Path(sys.argv[1])
-    prop = Path(sys.argv[2]).read_text() if len(sys.argv) > 2 else ""
-    result = evaluate_g0(json.loads(model_path.read_text()), dql_run_live=True, proposal_text=prop)
+    prop = Path(sys.argv[2]).read_text(encoding="utf-8") if len(sys.argv) > 2 else ""
+    result = evaluate_g0(json.loads(model_path.read_text(encoding="utf-8")), dql_run_live=True, proposal_text=prop)
     print(json.dumps(result.to_dict(), indent=2))
     sys.exit(0 if result.passed else 1)
