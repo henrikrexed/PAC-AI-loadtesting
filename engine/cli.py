@@ -150,10 +150,57 @@ def build(extract: dict, mode: str) -> tuple[dict, str]:
     return model, proposal
 
 
+def _run_init(sub_argv: list[str]) -> int:
+    import driver  # noqa: E402  (stdlib-only sibling)
+
+    ap = argparse.ArgumentParser(
+        prog="workload-engine init",
+        description="Install this repo's skills into a coding agent's skills directory and verify them.",
+    )
+    ap.add_argument("--dest", default=None,
+                    help="skills destination (default ~/.claude/skills; see docs/skills-install.md)")
+    ap.add_argument("--from", dest="from_dir", default=None,
+                    help="source skills/ directory (default: auto-detect next to the engine)")
+    return driver.cmd_init(ap.parse_args(sub_argv))
+
+
+def _run_guided(sub_argv: list[str]) -> int:
+    import driver  # noqa: E402
+
+    ap = argparse.ArgumentParser(
+        prog="workload-engine guided",
+        description="Drive the engine through the gated 4-step flow: propose+confirm -> choose -> generate -> try.",
+    )
+    ap.add_argument("--extract", required=True, help="path to the extract.json telemetry facts")
+    ap.add_argument("--out", required=True, help="output directory for the project artifacts")
+    ap.add_argument("--mode", required=True, choices=("agentic", "commerce"),
+                    help="behavioral taxonomy the extract's archetypes were split on")
+    ap.add_argument("--renderers", default="k6",
+                    help="comma-list of renderers: k6 (default), jmeter, locust, gatling")
+    ap.add_argument("--yes", action="store_true",
+                    help="confirm the V1 human gate non-interactively (CI / scripted)")
+    ap.add_argument("--try", dest="try_run", action="store_true",
+                    help="opt-in: run a few seconds of a real k6 smoke after generating")
+    ap.add_argument("--by", default="operator (guided flow)", help="approval attribution")
+    ap.add_argument("--at", default="", help="approval timestamp (ISO-8601); default now")
+    args = ap.parse_args(sub_argv)
+    if not args.at:
+        from datetime import datetime, timezone
+        args.at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return driver.run_guided(args, build)
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "init":
+        return _run_init(argv[1:])
+    if argv and argv[0] == "guided":
+        return _run_guided(argv[1:])
+
     ap = argparse.ArgumentParser(
         prog="workload-engine",
-        description="SCOPE-stage workload-model engine: extract.json -> workload-model.json + scenario-proposal.md (G0-gated).",
+        description="SCOPE-stage workload-model engine: extract.json -> workload-model.json + scenario-proposal.md (G0-gated). "
+                    "Subcommands: `init` (install skills), `guided` (4-step driver).",
     )
     ap.add_argument("--extract", required=True, help="path to the extract.json telemetry facts")
     ap.add_argument("--out", required=True, help="output directory for the two artifacts")

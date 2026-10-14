@@ -198,7 +198,59 @@ accept / iterate (parameter-only, ≤3×) / escalate.
 
 ---
 
-## 3. Troubleshooting
+## 3. Onboard and drive — `init` + `guided`
+
+The engine is also the **single entry point** for onboarding and for driving the whole
+loop as a conversational flow — no manual symlinking, no remembering the renderer
+entrypoints.
+
+### One-step onboarding
+
+```bash
+# two commands total: fetch + install skills, then drive
+curl -fsSL https://raw.githubusercontent.com/henrikrexed/AI-Performance-Testing/main/install.sh | sh
+```
+
+`install.sh` clones the repo (or downloads the tarball when `git` is absent) and runs
+`engine/cli.py init`, which **copies every skill into your agent's skills directory and
+verifies it**. The default destination is `~/.claude/skills` (the Claude Code user-wide
+path from [`skills-install.md`](skills-install.md)); override with `--dest` (e.g.
+`.agents/skills` for the cross-client location) or `AIPT_DEST=…`.
+
+```bash
+# from a checkout, equivalently:
+python3 engine/cli.py init                 # -> ~/.claude/skills, then verifies
+python3 engine/cli.py init --dest .agents/skills
+```
+
+### The guided 4-step flow
+
+```bash
+python3 engine/cli.py guided \
+    --extract examples/crewai-deepseek-agent/extract.json \
+    --out ./out --mode agentic            # add --renderers k6,jmeter,locust,gatling
+```
+
+The flow is the methodology loop, gated:
+
+1. **Propose + confirm** — builds the model, prints a readable summary + the full
+   `scenario-proposal.md`, and stops at the **V1 human gate**. Approval is **bound to the
+   model revision** (canonical hash of `spec`); the renderers fail closed without it.
+   Confirm interactively, or `--yes` in CI/scripts. *No confirm ⇒ nothing downstream runs.*
+2. **Choose output** — `--renderers` (default `k6`; one or several).
+3. **Generate** — renders the runnable project via the renderer skill's entrypoint when
+   its toolchain is present, otherwise prints the exact command.
+4. **Try it?** — *opt-in only* (`--try`): a few seconds of a real k6 smoke, else the
+   command to run it yourself. Production runs stay behind `loadtest-run`'s allowlist +
+   hard caps + auto-abort.
+
+A machine-readable `guided-state.json` records each step (and the honesty invariants:
+revision-bound confirm, `synthetic=true` baggage, opt-in run) so a coding agent can
+narrate the flow.
+
+---
+
+## 4. Troubleshooting
 
 | Symptom | Cause / fix |
 |---|---|

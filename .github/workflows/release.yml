@@ -76,6 +76,7 @@ jobs:
             --hidden-import shaping --hidden-import archetypes \
             --hidden-import clustering --hidden-import emit \
             --hidden-import g0_gate --hidden-import source_merge \
+            --hidden-import driver \
             engine/cli.py
 
       - name: Smoke test the binary
