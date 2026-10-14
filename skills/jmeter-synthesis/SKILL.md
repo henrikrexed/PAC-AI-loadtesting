@@ -11,6 +11,12 @@ interface + registry + acceptance harness from **ISI-5655** (`skills/renderer-ki
 alongside `k6` (`skills/k6-synthesis`), the Locust stub, and the planned
 Locust/Gatling renderers (ISI-5657/5658). Parent: **ISI-5622** (§8 renderer matrix).
 
+## Dependencies — installed by setup
+
+- Node.js >= 20 only — zero npm dependencies; lockfile verified by `skills/setup.sh` (`npm ci`).
+- JMeter + Plugins Manager (Throughput Shaping Timer, OpenTelemetry listener) are EXECUTE-time requirements — probed by `skills/preflight.sh --require-tools` with install hints.
+
+
 ## Usage
 
 ```

@@ -11,6 +11,13 @@ The production Locust renderer. One pure function over an approved
 Grounded in `docs/workload-model-engine-research.md` §4.1 (capability table),
 §4.2 (gaps G-O1/G-E1/G-X1), §4.3 (interface).
 
+## Dependencies — installed by setup
+
+- Node.js >= 20 only — zero npm dependencies; lockfile verified by `skills/setup.sh` (`npm ci`).
+- Generated locustfiles have their own runtime deps, exact-pinned in `runtime/requirements.txt` (`locust` + optional OTel extras).
+- The `locust` CLI is probed by `skills/preflight.sh` with an install hint.
+
+
 ## Output layout (files[] paths relative to an outDir)
 
 ```

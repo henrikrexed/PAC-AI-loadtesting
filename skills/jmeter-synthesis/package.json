@@ -6,5 +6,8 @@
   "description": "JMeter renderer (ISI-5656): approved workload-model.json -> .jmx + CSV data sets, conforming to the ISI-5655 Renderer interface.",
   "scripts": {
     "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

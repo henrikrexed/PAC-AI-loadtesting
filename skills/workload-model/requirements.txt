@@ -1,0 +1,4 @@
+# workload-model skill deps — installed by skills/setup.sh, verified by skills/preflight.sh.
+# Exact pins for reproducible pre-flight (WS-B, ISI-5927).
+jsonschema==4.26.0
+pytest==9.0.2

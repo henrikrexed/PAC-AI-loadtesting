@@ -15,6 +15,13 @@ Implements **§8 skill-map row 4 (EXECUTE → `loadtest-run`)** of
 confirmation test), **§5.3 `run-config.json`**, and **§7 safety rules**. It is the
 machine enforcer of gates **V2b-smoke** and **V2b** (§6).
 
+## Dependencies — installed by setup
+
+- No pip dependencies — scripts/tests are Python stdlib only (`requirements.txt` documents this).
+- The `k6` CLI is required at EXECUTE time; `skills/preflight.sh` / `preflight.ps1` probes it with an exact install command.
+- Python pins for sibling skills are installed by `skills/setup.sh`.
+
+
 ## Contract
 
 - **Input:** `run-config.json` (§5.3) + the approved `workload-model.json` (§4) + the

@@ -10,5 +10,8 @@
   "scripts": {
     "synthesize": "node bin/synthesize.mjs",
     "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

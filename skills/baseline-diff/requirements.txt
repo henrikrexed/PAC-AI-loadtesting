@@ -1,0 +1,4 @@
+# baseline-diff skill deps — installed by skills/setup.sh, verified by skills/preflight.sh.
+# Exact pins for reproducible pre-flight (WS-B, ISI-5927). Runtime also needs the
+# `dtctl` CLI + Dynatrace credentials (probed by preflight, not pip-installable).
+jsonschema==4.26.0

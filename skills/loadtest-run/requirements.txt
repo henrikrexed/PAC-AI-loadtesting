@@ -1,0 +1,3 @@
+# loadtest-run skill deps — none. Scripts and tests are Python stdlib only
+# (unittest, json, ...). The EXECUTE stage additionally needs the `k6` CLI,
+# which skills/preflight.sh probes with an actionable install hint (WS-B, ISI-5927).

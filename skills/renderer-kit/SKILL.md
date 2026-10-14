@@ -9,6 +9,12 @@ The prerequisite that makes the k6 / JMeter / Locust / Gatling renderers buildab
 in parallel. Grounded in `docs/workload-model-engine-research.md` §4 and
 `docs/methodology.md` §4 (v1.1).
 
+## Dependencies — installed by setup
+
+- Node.js >= 20 only — zero npm dependencies; lockfile verified by `skills/setup.sh` (`npm ci`).
+- No other prerequisites; no runtime package installs expected.
+
+
 ## The Renderer interface (§4.3)
 
 A renderer is a **pure function** over an approved `workload-model.json` — no

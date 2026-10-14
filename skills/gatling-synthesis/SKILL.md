@@ -9,6 +9,12 @@ The Gatling output renderer. One of the four tool renderers planned under ISI-56
 gated on and built against the `renderer-kit` foundation (ISI-5655). Grounded in
 `docs/workload-model-engine-research.md` §4.1 (capability table) and §4.3 (interface).
 
+## Dependencies — installed by setup
+
+- Node.js >= 20 only — zero npm dependencies; lockfile verified by `skills/setup.sh` (`npm ci`).
+- Gatling (JDK 17+) is needed only to RUN generated simulations — probed by `skills/preflight.sh` with an install hint.
+
+
 ## What it produces
 
 `render(model)` → `{ files, warnings }`:

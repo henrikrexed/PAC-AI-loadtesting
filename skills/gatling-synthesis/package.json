@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Gatling renderer (ISI-5658): approved §4 workload-model.json -> Gatling Scala simulation + JSON feeders. Conforms to the renderer-kit Renderer interface (ISI-5655). Pure, deterministic, network-free.",
+  "description": "Gatling renderer (ISI-5658): approved \u00a74 workload-model.json -> Gatling Scala simulation + JSON feeders. Conforms to the renderer-kit Renderer interface (ISI-5655). Pure, deterministic, network-free.",
   "exports": {
     ".": "./lib/index.mjs"
   },
   "scripts": {
     "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

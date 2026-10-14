@@ -15,6 +15,13 @@ commodity (see `docs/skills-mcp-decisions.md`).
 *shape*, and what happens next — `accept`, `iterate` (parameter-only, ≤3×), or
 `escalate` to the human with diff evidence.
 
+## Dependencies — installed by setup
+
+- Python 3.10+ with `jsonschema`, exact-pinned in `requirements.txt` here.
+- The `dtctl` CLI + Dynatrace credentials are runtime requirements — probed (with install hints) by `skills/preflight.sh --require-tools` / `preflight.ps1 -RequireTools`.
+- Installed by `skills/setup.sh`; no runtime package installs expected.
+
+
 ## Inputs → outputs (contract)
 
 - **Input:** `runs/<ts>/` (from `loadtest-run`) + a production baseline window.

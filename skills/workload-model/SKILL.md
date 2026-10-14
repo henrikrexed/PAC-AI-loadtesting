@@ -19,6 +19,13 @@ Output: `loadtests/<target>/workload-model.json` (schema-valid, G0-passed) +
 `scenario-proposal.md` (§5.2 template). The proposal is the **VALIDATE / Gate-V1** input —
 no synthesis or run may proceed until a human approves it, bound to the model revision+hash.
 
+## Dependencies — installed by setup
+
+- Python 3.10+ with `jsonschema` and `pytest`, exact-pinned in `requirements.txt` here.
+- Installed by `skills/setup.sh`; verified by `skills/preflight.sh` (POSIX) / `skills/preflight.ps1` (Windows).
+- No runtime package installs expected — SKILL use assumes setup already ran.
+
+
 ## Build-vs-buy decision (§8 row 1) — BUILD SKILL
 
 Per `docs/skills-mcp-decisions.md`: **build**, grounded in `dtctl` DQL. The extraction logic is

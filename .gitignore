@@ -19,3 +19,6 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 *cache*/
+
+# WS-B setup.sh venv fallback (ISI-5927)
+skills/.venv/

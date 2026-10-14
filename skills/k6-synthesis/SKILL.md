@@ -8,6 +8,13 @@ description: SYNTHESIZE stage of the AI load-testing loop (methodology §3.3). T
 Generates versioned, reviewable k6 load-test code from an **approved** workload model.
 Implements methodology `docs/methodology.md` §3.3 (skill-map §8 row 3) and the §4 schema.
 
+## Dependencies — installed by setup
+
+- Node.js >= 20 only — this package has **zero npm dependencies** (pure ESM, `node --test`).
+- `package-lock.json` is committed; `skills/setup.sh` verifies it with `npm ci` (a verified no-op).
+- The `k6` CLI is needed only to RUN generated scripts — probed by `skills/preflight.sh` with an install hint.
+
+
 ## Contract
 
 - **Input:** an approved `workload-model.json` (§4 schema). The model MUST carry
