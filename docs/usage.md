@@ -29,12 +29,14 @@ Run the first half of the loop on the bundled synthetic example — no tenant, n
 
 ```bash
 # SCOPE on a synthetic extract -> G0-validated model + human-readable proposal
+# (output is stamped provenance.kind=demo-sample — demo data is never silently selectable)
 (cd skills/workload-model && python3 scripts/build_example.py \
   && cat out/example-frontend/scenario-proposal.md)
 
 # SYNTHESIZE the committed example model -> a runnable k6 script (V2a static gate)
+# --demo: the example model is demo-stamped; renderers refuse demo data without opt-in
 (cd skills/k6-synthesis \
-  && node bin/synthesize.mjs ../../examples/workload-model.example.json /tmp/example-out)
+  && node bin/synthesize.mjs ../../examples/workload-model.example.json /tmp/example-out --demo)
 ```
 
 The example artifacts in [`../examples/`](../examples) show exactly what each stage
@@ -52,7 +54,11 @@ your tenant, ask for the loop in plain language:
 
 The agent will:
 
-1. **SCOPE** — run the DQL extraction (via `dtctl`), build a `workload-model.json`, and
+1. **SCOPE** — run the fail-closed environment probe first
+   (`skills/workload-model/scripts/env_probe.py`: dtctl present · DQL reachable · target
+   observed — no probe, no extraction, **never a silent fallback to example data**), then
+   run the DQL extraction (via `dtctl`), build a `workload-model.json` stamped with its
+   provenance (`extracted-from: <query pack> on tenant <Y> (<window>)`), and
    write a `scenario-proposal.md`. The engine self-checks with **G0**.
 2. **VALIDATE** — stop and present the proposal. **Nothing runs until you approve it**
    (Gate V1). Approval is bound to the model revision; editing the model invalidates it.

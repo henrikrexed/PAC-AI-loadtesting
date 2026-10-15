@@ -129,12 +129,14 @@ git clone https://github.com/henrikrexed/AI-Performance-Testing.git
 cd AI-Performance-Testing
 
 # SCOPE: synthetic extraction → a G0-validated model + a human-readable proposal
+# (stamped provenance.kind=demo-sample — demo data is never silently selectable)
 (cd skills/workload-model && python3 scripts/build_example.py \
   && cat out/example-frontend/scenario-proposal.md)
 
 # SYNTHESIZE: turn the committed example model into a runnable k6 script (V2a gate)
+# (--demo: the example model is demo-stamped; renderers refuse demo data without opt-in)
 (cd skills/k6-synthesis \
-  && node bin/synthesize.mjs ../../examples/workload-model.example.json /tmp/example-out)
+  && node bin/synthesize.mjs ../../examples/workload-model.example.json /tmp/example-out --demo)
 ```
 
 Read the proposal, then look at what SYNTHESIZE generated — this is also where you see the

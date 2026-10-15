@@ -220,7 +220,10 @@ node bin/synthesize.mjs <approved-workload-model.json> ../../loadtests/<target>/
 ```
 
 Try it on the worked example first: feed it the **unapproved** model from 5.1 and watch
-it refuse (that is the V1 gate working); then add the approval block and re-run. Output:
+it refuse **twice** — first the demo guard (the 5.1 model is stamped
+`provenance.kind=demo-sample`; demo data is never silently selectable, so pass `--demo`
+to opt in), then the V1 gate (unapproved). With `--demo` + the approval block added,
+re-run succeeds. Output:
 
 - `k6/<model>.js` — one k6 scenario per journey, arrival-profile-faithful executors,
   correlated request chains (extract → inject per `correlates` edge), fail-fast on null
