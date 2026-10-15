@@ -41,6 +41,26 @@ export function assertApproved(model) {
   return a;
 }
 
+/**
+ * Demo-data quarantine (ISI-5928): refuse a `provenance.kind === "demo-sample"` model
+ * unless the operator explicitly opted in (`--demo` flag or WORKLOAD_MODEL_ALLOW_DEMO=1).
+ * Demo samples are documentation, not inputs — a fresh-target run must never silently
+ * consume example data. Models with NO provenance (pre-ISI-5928 legacy) warn, not fail.
+ */
+export function assertNotDemo(model, opts = {}) {
+  const allow = opts.allowDemo || process.env.WORKLOAD_MODEL_ALLOW_DEMO === '1';
+  const prov = model.metadata?.source?.provenance;
+  if (prov?.kind === 'demo-sample' && !allow) {
+    throw new Error(
+      `demo guard (ISI-5928): model "${model.metadata?.name}" is a demo-sample (${prov.note || 'synthetic/demo data'}). ` +
+        'Demo data is never silently selectable as input. Re-run extraction against your real ' +
+        'tenant (skills/workload-model/scripts/env_probe.py), or pass --demo / set ' +
+        'WORKLOAD_MODEL_ALLOW_DEMO=1 to explicitly opt in to the demo.'
+    );
+  }
+  return { provenanceWarning: !prov ? 'model carries no provenance (pre-ISI-5928 legacy) — treat with suspicion' : null };
+}
+
 /** Map each referenced payload pool to its kind ('cache-key' | 'record'). */
 export function poolKinds(model) {
   const pools = (model.spec && model.spec.payloads) || {};

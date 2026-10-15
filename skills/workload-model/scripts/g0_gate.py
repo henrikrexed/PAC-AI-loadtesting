@@ -152,10 +152,17 @@ def evaluate_g0(
     g.add("caps", bool(caps.get("maxRps") or caps.get("maxVus")) and bool(caps.get("maxDuration")),
           f"caps declared: {caps}")
 
-    # 10. all DQL run live
-    g.add("dql-live", bool(dql_run_live),
-          "all DQL queries run live against the tenant and field names confirmed"
-          if dql_run_live else "DQL not attested as run live")
+    # 10. all DQL run live — honest per provenance kind (ISI-5928): a demo-sample model
+    #     makes NO live-DQL claim (n/a, not a silent pass); an extracted model must be
+    #     attested live by the operator/adapter.
+    prov = source.get("provenance") or {}
+    prov_kind = prov.get("kind")
+    if prov_kind == "demo-sample":
+        g.add("dql-live", True, "n/a — demo-sample: no live-DQL claim is made (explicit opt-in)")
+    else:
+        g.add("dql-live", bool(dql_run_live),
+              "all DQL queries run live against the tenant and field names confirmed"
+              if dql_run_live else "DQL not attested as run live")
 
     # 11. access-log availability confirmed OR spans-only caveat recorded
     avail = source.get("accessLogAvailability")
@@ -169,6 +176,20 @@ def evaluate_g0(
     g.add("evidence-tagging", tag_ok,
           "every journey carries an evidenceSource tag"
           if tag_ok else "journey missing evidenceSource (span/accesslog/both)")
+
+    # 13. provenance (ISI-5928) — fail-closed: every model declares where its numbers came from
+    if prov_kind == "extracted":
+        p_ok = bool(prov.get("extractedFrom")) and bool(prov.get("tenant")) and bool(prov.get("window"))
+        g.add("provenance", p_ok,
+              f"extracted — {prov.get('extractedFrom')}"
+              if p_ok else "kind=extracted but extractedFrom/tenant/window incomplete")
+    elif prov_kind == "demo-sample":
+        g.add("provenance", True,
+              "demo-sample — synthetic/demo data; consumers must explicitly opt in (--demo)")
+    else:
+        g.add("provenance", False,
+              "no provenance — fail-closed (ISI-5928): rebuild via workload-engine with a real "
+              "extract (the adapter records provenance) or pass --demo for the synthetic example")
 
     return g
 
@@ -198,11 +219,19 @@ def _check_cache_profiles(payloads: dict[str, Any]) -> tuple[bool, list[str]]:
     return (not bad), bad
 
 
-if __name__ == "__main__":  # CLI: python g0_gate.py <model.json> [proposal.md]
+if __name__ == "__main__":  # CLI: python g0_gate.py <model.json> [proposal.md] [--attest-live]
     import sys
 
-    model_path = Path(sys.argv[1])
-    prop = Path(sys.argv[2]).read_text() if len(sys.argv) > 2 else ""
-    result = evaluate_g0(json.loads(model_path.read_text()), dql_run_live=True, proposal_text=prop)
+    args = [a for a in sys.argv[1:] if a != "--attest-live"]
+    attest_live = "--attest-live" in sys.argv
+    model_path = Path(args[0])
+    prop = Path(args[1]).read_text() if len(args) > 1 else ""
+    model = json.loads(model_path.read_text())
+    # dql_run_live derives from the model's own provenance, not a hardcoded True (ISI-5928):
+    # the gate never claims live DQL the model cannot show. --attest-live lets the operator
+    # assert it explicitly for extracted models whose adapter predates provenance.dqlRunLive.
+    prov = model.get("metadata", {}).get("source", {}).get("provenance") or {}
+    live = attest_live or (prov.get("kind") == "extracted" and bool(prov.get("dqlRunLive")))
+    result = evaluate_g0(model, dql_run_live=live, proposal_text=prop)
     print(json.dumps(result.to_dict(), indent=2))
     sys.exit(0 if result.passed else 1)

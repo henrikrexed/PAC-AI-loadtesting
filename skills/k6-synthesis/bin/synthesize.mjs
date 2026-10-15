@@ -13,6 +13,7 @@ function parseArgs(argv) {
   const opts = {};
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--ttl') opts.ttlSec = Number(argv[++i]);
+    else if (argv[i] === '--demo') opts.allowDemo = true;
     else pos.push(argv[i]);
   }
   return { modelPath: pos[0], outDir: pos[1], opts };
@@ -21,7 +22,7 @@ function parseArgs(argv) {
 function main() {
   const { modelPath, outDir, opts } = parseArgs(process.argv.slice(2));
   if (!modelPath || !outDir) {
-    console.error('usage: synthesize.mjs <workload-model.json> <output-dir> [--ttl <sec>]');
+    console.error('usage: synthesize.mjs <workload-model.json> <output-dir> [--ttl <sec>] [--demo]');
     process.exit(2);
   }
   let res;

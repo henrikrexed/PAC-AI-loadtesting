@@ -9,7 +9,7 @@
 // --check` and inspects files on disk. render() is the pure interchange surface.
 
 import { defineRenderer, makeCapabilityReport } from './vendor/renderer.mjs';
-import { loadModel, assertApproved } from './model.mjs';
+import { loadModel, assertApproved, assertNotDemo } from './model.mjs';
 import { buildArtifacts } from './synthesize.mjs';
 
 /**
@@ -44,6 +44,7 @@ function supports(model) {
  */
 function render(modelPathOrObj, opts = {}) {
   const model = loadModel(modelPathOrObj);
+  assertNotDemo(model, opts); // ISI-5928 demo guard — BEFORE V1: demo data refused without opt-in
   assertApproved(model); // V1 gate — k6 refuses unapproved models
   const { files, warnings } = buildArtifacts(model, opts);
   return { files, warnings };

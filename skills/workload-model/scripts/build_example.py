@@ -114,6 +114,7 @@ def build_commerce(fx: dict):
         payloads=payloads,
         caps=caps,
         coverage=cov,
+        provenance=fx.get("provenance"),
     )
 
     proposal = render_proposal(
@@ -157,7 +158,7 @@ def main() -> int:
     (out_dir / "workload-model.json").write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
     (out_dir / "scenario-proposal.md").write_text(proposal, encoding="utf-8")
 
-    g = evaluate_g0(model, dql_run_live=True, proposal_text=proposal)
+    g = evaluate_g0(model, dql_run_live=False, proposal_text=proposal)  # synthetic fixture: no live claim
     print(json.dumps(g.to_dict(), indent=2))
     print(f"\narchetypes: {[(a.id, round(a.weight, 3), len(a.steps)) for a in archetypes]}  coverage={cov:.3f}")
     print(f"wrote {out_dir}/workload-model.json  and  scenario-proposal.md")

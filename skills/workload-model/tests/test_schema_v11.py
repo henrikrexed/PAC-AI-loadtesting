@@ -78,3 +78,32 @@ def test_g_p1_target_requires_into():
     model["spec"]["payloads"]["checkout"]["fields"][0]["target"] = {"as": "email"}
     errs = list(_validator().iter_errors(model))
     assert len(errs) >= 1
+
+
+# --- ISI-5928: provenance block ------------------------------------------------------
+
+def _model_with_provenance(prov):
+    model = _pre_v11_model()
+    model.setdefault("metadata", {}).setdefault("source", {})["provenance"] = prov
+    return model
+
+
+def test_provenance_demo_sample_minimal_validates():
+    errs = list(_validator().iter_errors(_model_with_provenance(
+        {"kind": "demo-sample", "note": "synthetic"})))
+    assert errs == [], [e.message for e in errs]
+
+
+def test_provenance_extracted_requires_extracted_from_tenant_window():
+    errs = list(_validator().iter_errors(_model_with_provenance({"kind": "extracted"})))
+    assert any("extractedFrom" in e.message or "tenant" in e.message or "window" in e.message
+               for e in errs), [e.message for e in errs]
+    ok = {"kind": "extracted", "extractedFrom": "pack on tenant t (3h)",
+          "tenant": "t", "window": "3h"}
+    errs2 = list(_validator().iter_errors(_model_with_provenance(ok)))
+    assert errs2 == [], [e.message for e in errs2]
+
+
+def test_provenance_rejects_unknown_kind():
+    errs = list(_validator().iter_errors(_model_with_provenance({"kind": "maybe"})))
+    assert errs and any("is not one of" in e.message for e in errs)

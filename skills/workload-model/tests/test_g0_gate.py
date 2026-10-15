@@ -38,7 +38,51 @@ def _proposal():
 def test_real_artifact_passes_g0():
     g = g0.evaluate_g0(_model(), dql_run_live=True, proposal_text=_proposal())
     assert g.passed, [c.detail for c in g.failures]
-    assert len(g.checks) == 12
+    assert len(g.checks) == 13
+
+
+def test_provenance_required_fail_closed():
+    # ISI-5928: a model with no provenance must fail G0 — no "unknown-but-shipped" kind.
+    m = copy.deepcopy(_model())
+    m["metadata"]["source"].pop("provenance", None)
+    g = g0.evaluate_g0(m, dql_run_live=True, proposal_text=_proposal())
+    assert not g.passed
+    assert any(c.id == "provenance" and not c.passed for c in g.checks)
+
+
+def test_demo_sample_dql_live_is_na_not_a_silent_pass():
+    # The rebuilt example artifact is demo-stamped: dql-live records n/a (no live claim)
+    # rather than silently claiming live DQL — even when the caller passes True.
+    m = _model()
+    assert m["metadata"]["source"]["provenance"]["kind"] == "demo-sample"
+    for attest in (True, False):
+        g = g0.evaluate_g0(m, dql_run_live=attest, proposal_text=_proposal())
+        c = next(c for c in g.checks if c.id == "dql-live")
+        assert c.passed and "no live-DQL claim" in c.detail
+        p = next(c for c in g.checks if c.id == "provenance")
+        assert p.passed and "demo-sample" in p.detail
+
+
+def test_extracted_provenance_needs_live_attestation():
+    m = copy.deepcopy(_model())
+    m["metadata"]["source"]["provenance"] = {
+        "kind": "extracted",
+        "extractedFrom": "the SKILL.md DQL query pack (9 queries) on tenant t (3h)",
+        "queryPack": ["q1"], "tenant": "t", "window": "3h",
+        "ranAtIso": "2026-10-15T00:00:00Z", "dqlRunLive": True,
+    }
+    g = g0.evaluate_g0(m, dql_run_live=False, proposal_text=_proposal())
+    assert next(c for c in g.checks if c.id == "provenance").passed
+    assert not next(c for c in g.checks if c.id == "dql-live").passed
+    g2 = g0.evaluate_g0(m, dql_run_live=True, proposal_text=_proposal())
+    assert next(c for c in g2.checks if c.id == "dql-live").passed
+
+
+def test_extracted_provenance_incomplete_fails():
+    m = copy.deepcopy(_model())
+    m["metadata"]["source"]["provenance"] = {"kind": "extracted"}  # no extractedFrom/tenant/window
+    g = g0.evaluate_g0(m, dql_run_live=True, proposal_text=_proposal())
+    assert not next(c for c in g.checks if c.id == "provenance").passed
 
 
 def test_blocks_when_accesslog_unknown_and_no_caveat():
@@ -91,7 +135,17 @@ def test_blocks_on_cacheprofile_missing_keycardinality():
 
 
 def test_blocks_when_dql_not_run_live():
-    g = g0.evaluate_g0(_model(), dql_run_live=False, proposal_text=_proposal())
+    # ISI-5928: dql-live only applies to EXTRACTED models — an extracted model not
+    # attested live must block. (The example artifact is demo-stamped: n/a, see
+    # test_demo_sample_dql_live_is_na_not_a_silent_pass.)
+    m = copy.deepcopy(_model())
+    m["metadata"]["source"]["provenance"] = {
+        "kind": "extracted",
+        "extractedFrom": "the SKILL.md DQL query pack (9 queries) on tenant t (3h)",
+        "queryPack": ["q1"], "tenant": "t", "window": "3h",
+        "ranAtIso": "2026-10-15T00:00:00Z", "dqlRunLive": True,
+    }
+    g = g0.evaluate_g0(m, dql_run_live=False, proposal_text=_proposal())
     assert any(c.id == "dql-live" and not c.passed for c in g.checks)
 
 

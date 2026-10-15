@@ -2,21 +2,28 @@
 Docker image invoke.
 
     workload-engine --extract <extract.json> --out <dir> [--mode commerce|agentic]
+    workload-engine --demo --out <dir>          # synthetic example, EXPLICIT opt-in
 
 Input: a **neutral telemetry extract** (JSON) produced by a backend adapter (the dtctl/DQL
 query pack in SKILL.md, or any other backend). Output: `<dir>/workload-model.json` +
 `<dir>/scenario-proposal.md`, self-validated by the G0 gate. Exit 0 iff G0 passes.
+
+Real-scan integrity (ISI-5928) — fail-closed contract:
+  - `--extract` has NO default. Running without it and without `--demo` exits 2 with
+    guidance (never a silent synthetic fallback).
+  - `--demo` is the explicit opt-in for the bundled synthetic fixture; its output is
+    stamped `provenance.kind = "demo-sample"` and refused by consumers unless they also
+    opt in. If the extract carries its own provenance, that wins over `--demo`.
+  - Real extracts record a `provenance` block (kind=extracted, tenant, window, queryPack,
+    dqlRunLive) — produce it via `env_probe.py`, which prints the template. A model with
+    no provenance fails G0.
+  - `dql_run_live` for the G0 gate is derived from provenance, never hardcoded.
 
 The engine is backend- and tool-agnostic: it never talks to Dynatrace or to a load tool. It
 turns neutral facts into a workload model and gates it. The behavioral split is the same
 engine across domains — commerce (Buyer / Browser, split on the order-terminal service) and
 agentic apps (Agentic / Conversational, split on the `execute_tool` tool-use signal); see
 `archetypes.classify_by_terminal`.
-
-`--extract` defaults to the bundled synthetic commerce fixture, so `--help` and a no-arg demo
-run work out of the box. The commerce path is identical to `build_example.py` (the skill's
-worked example). The agentic path expects an agentic-shaped extract (keys documented in
-`_build_agentic`); produce one with the agentic query pack.
 """
 
 from __future__ import annotations
@@ -33,8 +40,20 @@ import shaping as sh                                            # noqa: E402
 from archetypes import AGENTIC_TOOL_PATTERNS, classify_by_terminal  # noqa: E402
 from build_example import build_commerce                       # noqa: E402
 from clustering import Journey                                 # noqa: E402
-from emit import build_model, render_proposal                  # noqa: E402
+from emit import build_model, make_demo_provenance, render_proposal  # noqa: E402
 from g0_gate import evaluate_g0                                # noqa: E402
+
+
+FAIL_CLOSED_MSG = (
+    "no telemetry extract provided. The engine is fail-closed (ISI-5928): it will NOT\n"
+    "silently fall back to the bundled synthetic example.\n"
+    "  - Real run:   run scripts/env_probe.py --context <ctx> [--service <svc>], run the\n"
+    "                SKILL.md DQL pack, record the probe's provenanceTemplate into your\n"
+    "                extract JSON, then: workload-engine --extract <extract.json> --out <dir>\n"
+    "  - Demo run:   workload-engine --demo --out <dir>\n"
+    "                (output stamped provenance.kind=demo-sample; consumers refuse it\n"
+    "                 unless explicitly opted in with --demo / WORKLOAD_MODEL_ALLOW_DEMO=1)"
+)
 
 
 def _default_fixture() -> Path:
@@ -122,6 +141,7 @@ def _build_agentic(fx: dict):
         },
         caps={"maxRps": 2, "maxVus": 20, "maxDuration": "30m"},
         coverage=split["coverage"],
+        provenance=fx.get("provenance"),
     )
     proposal = render_proposal(
         model, exclusions="none within service scope",
@@ -146,7 +166,12 @@ def run(extract: dict, out_dir: Path, mode: str) -> int:
     (out_dir / "workload-model.json").write_text(json.dumps(model, indent=2) + "\n", encoding="utf-8")
     (out_dir / "scenario-proposal.md").write_text(proposal, encoding="utf-8")
 
-    g = evaluate_g0(model, dql_run_live=True, proposal_text=proposal)
+    # dql_run_live is derived from the model's own provenance (ISI-5928), never hardcoded:
+    # extracted models attest live DQL via provenance.dqlRunLive; demo-sample models make
+    # no live claim (the gate records n/a, not a silent pass).
+    prov = model.get("metadata", {}).get("source", {}).get("provenance") or {}
+    live = prov.get("kind") == "extracted" and bool(prov.get("dqlRunLive"))
+    g = evaluate_g0(model, dql_run_live=live, proposal_text=proposal)
     print(json.dumps(g.to_dict(), indent=2))
     print(f"\nG0 {'PASS' if g.passed else 'FAIL'} ({sum(c.passed for c in g.checks)}/{len(g.checks)})"
           f"  -> {out_dir}/workload-model.json")
@@ -155,13 +180,35 @@ def run(extract: dict, out_dir: Path, mode: str) -> int:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(prog="workload-engine", description="workload-model engine CLI (SCOPE)")
-    ap.add_argument("--extract", type=Path, default=_default_fixture(),
-                    help="neutral telemetry extract JSON (default: bundled synthetic commerce fixture)")
+    ap.add_argument("--extract", type=Path, default=None,
+                    help="neutral telemetry extract JSON (REQUIRED unless --demo)")
     ap.add_argument("--out", required=True, type=Path, help="output directory")
     ap.add_argument("--mode", default="commerce", choices=["commerce", "agentic"],
                     help="behavioral split: commerce (Buyer/Browser) or agentic (Agentic/Conversational)")
+    ap.add_argument("--demo", action="store_true",
+                    help="explicit opt-in: use the bundled synthetic fixture when no --extract "
+                         "is given, and stamp the output provenance.kind=demo-sample if the "
+                         "extract carries no provenance of its own")
     a = ap.parse_args(argv)
-    return run(json.loads(a.extract.read_text(encoding="utf-8")), a.out, a.mode)
+
+    if a.extract is None:
+        if not a.demo:
+            print(f"workload-engine: {FAIL_CLOSED_MSG}", file=sys.stderr)
+            return 2
+        extract_path = _default_fixture()
+    else:
+        extract_path = a.extract
+
+    extract = json.loads(extract_path.read_text(encoding="utf-8"))
+    # Provenance precedence (ISI-5928): the extract's own provenance wins; --demo stamps a
+    # demo-sample only when the caller provided none (e.g. the bundled synthetic fixture).
+    if extract.get("provenance") is None and a.demo:
+        extract["provenance"] = make_demo_provenance(
+            "bundled synthetic fixture / examples data (--demo explicit opt-in); "
+            "not extracted from any tenant"
+        )
+
+    return run(extract, a.out, a.mode)
 
 
 if __name__ == "__main__":

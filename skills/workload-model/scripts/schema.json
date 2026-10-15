@@ -3,33 +3,89 @@
   "$id": "https://github.com/henrikrexed/AI-Performance-Testing/schemas/workload-model.schema.json",
   "title": "WorkloadModel",
   "type": "object",
-  "required": ["apiVersion", "kind", "metadata", "spec", "status"],
+  "required": [
+    "apiVersion",
+    "kind",
+    "metadata",
+    "spec",
+    "status"
+  ],
   "properties": {
-    "apiVersion": { "const": "loadtest.isi/v1alpha1" },
-    "kind": { "const": "WorkloadModel" },
+    "apiVersion": {
+      "const": "loadtest.isi/v1alpha1"
+    },
+    "kind": {
+      "const": "WorkloadModel"
+    },
     "metadata": {
       "type": "object",
-      "required": ["name", "targetService", "environment", "source"],
+      "required": [
+        "name",
+        "targetService",
+        "environment",
+        "source"
+      ],
       "properties": {
-        "name": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
-        "targetService": { "type": "string" },
-        "environment": { "type": "string", "description": "Dynatrace environment/tenant name analyzed" },
-        "generatedAt": { "type": "string", "format": "date-time" },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]*$"
+        },
+        "targetService": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string",
+          "description": "Dynatrace environment/tenant name analyzed"
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "source": {
           "type": "object",
-          "required": ["tool", "timeframe"],
+          "required": [
+            "tool",
+            "timeframe"
+          ],
           "properties": {
-            "tool": { "type": "string", "examples": ["dynatrace-dql", "dtctl"] },
-            "timeframe": { "type": "string", "description": "ISO interval analyzed, e.g. 2026-09-01T00:00Z/2026-09-08T00:00Z" },
-            "timeframeNotes": { "type": "string", "description": "deploy/incident exclusions applied" },
-            "queries": { "type": "array", "items": { "type": "string" } },
+            "tool": {
+              "type": "string",
+              "examples": [
+                "dynatrace-dql",
+                "dtctl"
+              ]
+            },
+            "timeframe": {
+              "type": "string",
+              "description": "ISO interval analyzed, e.g. 2026-09-01T00:00Z/2026-09-08T00:00Z"
+            },
+            "timeframeNotes": {
+              "type": "string",
+              "description": "deploy/incident exclusions applied"
+            },
+            "queries": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
             "evidenceSources": {
               "type": "array",
               "description": "G0 dual-source tag: which telemetry sources backed this extraction",
-              "items": { "enum": ["span", "accesslog", "both"] }
+              "items": {
+                "enum": [
+                  "span",
+                  "accesslog",
+                  "both"
+                ]
+              }
             },
             "accessLogAvailability": {
-              "enum": ["available", "unavailable", "unknown"],
+              "enum": [
+                "available",
+                "unavailable",
+                "unknown"
+              ],
               "description": "Istio/Envoy access-log availability on the tenant (G0 exit criterion)"
             },
             "samplingRatio": {
@@ -38,23 +94,46 @@
             },
             "sessionIdCoverage": {
               "type": "object",
-              "description": "SCOPE §3.1 step 2c tier (ii) / R5: OTel session.id coverage on spans (Path B). Recorded alongside samplingRatio so session-stitch fidelity is auditable. hasSessionSignal=false ⇒ span-order fallback (tiers 2a/2b) was used.",
-              "required": ["hasSessionSignal", "overallCoveragePct"],
+              "description": "SCOPE \u00a73.1 step 2c tier (ii) / R5: OTel session.id coverage on spans (Path B). Recorded alongside samplingRatio so session-stitch fidelity is auditable. hasSessionSignal=false \u21d2 span-order fallback (tiers 2a/2b) was used.",
+              "required": [
+                "hasSessionSignal",
+                "overallCoveragePct"
+              ],
               "properties": {
-                "hasSessionSignal": { "type": "boolean" },
-                "overallCoveragePct": { "type": "number", "description": "Σ session-bearing spans / Σ spans over reported services" },
+                "hasSessionSignal": {
+                  "type": "boolean"
+                },
+                "overallCoveragePct": {
+                  "type": "number",
+                  "description": "\u03a3 session-bearing spans / \u03a3 spans over reported services"
+                },
                 "services": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "required": ["service", "coveragePct"],
+                    "required": [
+                      "service",
+                      "coveragePct"
+                    ],
                     "properties": {
-                      "service": { "type": "string" },
-                      "totalSpans": { "type": "integer" },
-                      "sessionSpans": { "type": "integer" },
-                      "sessions": { "type": "integer" },
-                      "coveragePct": { "type": "number" },
-                      "meanActions": { "type": "number" }
+                      "service": {
+                        "type": "string"
+                      },
+                      "totalSpans": {
+                        "type": "integer"
+                      },
+                      "sessionSpans": {
+                        "type": "integer"
+                      },
+                      "sessions": {
+                        "type": "integer"
+                      },
+                      "coveragePct": {
+                        "type": "number"
+                      },
+                      "meanActions": {
+                        "type": "number"
+                      }
                     }
                   }
                 }
@@ -62,27 +141,111 @@
             },
             "rumSessionCoverage": {
               "type": "object",
-              "description": "SCOPE §3.1 step 2c (RUM, Grail-native): coverage from Dynatrace `user.sessions`/`user.events` (dt.rum.session.id). hasRumSignal=true ⇒ real user-session population is DQL-reachable. Ordered journeys + exact think-times require `user.events` (OAuth scope storage:user.events:read).",
-              "required": ["hasRumSignal", "totalSessions"],
+              "description": "SCOPE \u00a73.1 step 2c (RUM, Grail-native): coverage from Dynatrace `user.sessions`/`user.events` (dt.rum.session.id). hasRumSignal=true \u21d2 real user-session population is DQL-reachable. Ordered journeys + exact think-times require `user.events` (OAuth scope storage:user.events:read).",
+              "required": [
+                "hasRumSignal",
+                "totalSessions"
+              ],
               "properties": {
-                "hasRumSignal": { "type": "boolean" },
-                "totalSessions": { "type": "integer" },
-                "userEventsAccessible": { "type": "boolean", "description": "false ⇒ ordered-journey upgrade is scope-gated on storage:user.events:read" },
+                "hasRumSignal": {
+                  "type": "boolean"
+                },
+                "totalSessions": {
+                  "type": "integer"
+                },
+                "userEventsAccessible": {
+                  "type": "boolean",
+                  "description": "false \u21d2 ordered-journey upgrade is scope-gated on storage:user.events:read"
+                },
                 "apps": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "required": ["app", "sessions"],
+                    "required": [
+                      "app",
+                      "sessions"
+                    ],
                     "properties": {
-                      "app": { "type": "string" },
-                      "type": { "enum": ["web", "mobile", "unknown"] },
-                      "sessions": { "type": "integer" },
-                      "actionsP50": { "type": "number" },
-                      "durationP50Seconds": { "type": "number" },
-                      "bounceRate": { "type": "number" }
+                      "app": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "enum": [
+                          "web",
+                          "mobile",
+                          "unknown"
+                        ]
+                      },
+                      "sessions": {
+                        "type": "integer"
+                      },
+                      "actionsP50": {
+                        "type": "number"
+                      },
+                      "durationP50Seconds": {
+                        "type": "number"
+                      },
+                      "bounceRate": {
+                        "type": "number"
+                      }
                     }
                   }
                 }
+              }
+            },
+            "provenance": {
+              "type": "object",
+              "description": "Data provenance (ISI-5928). Fail-closed: G0 refuses models without it. kind=extracted => the numbers came from live backend queries against the named tenant/window; kind=demo-sample => synthetic/demo data, consumers must explicitly opt in (--demo / WORKLOAD_MODEL_ALLOW_DEMO=1).",
+              "required": [
+                "kind"
+              ],
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "extracted",
+                    "demo-sample"
+                  ]
+                },
+                "extractedFrom": {
+                  "type": "string",
+                  "description": "'<query pack> on tenant <Y> (<window>)' \u2014 human-readable extraction record"
+                },
+                "queryPack": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "tenant": {
+                  "type": "string"
+                },
+                "window": {
+                  "type": "string"
+                },
+                "ranAtIso": {
+                  "type": "string"
+                },
+                "dqlRunLive": {
+                  "type": "boolean"
+                },
+                "note": {
+                  "type": "string"
+                }
+              },
+              "if": {
+                "properties": {
+                  "kind": {
+                    "const": "extracted"
+                  }
+                }
+              },
+              "then": {
+                "required": [
+                  "extractedFrom",
+                  "tenant",
+                  "window"
+                ]
               }
             }
           }
@@ -91,32 +254,70 @@
     },
     "spec": {
       "type": "object",
-      "required": ["arrivalProfile", "journeys", "coverage"],
+      "required": [
+        "arrivalProfile",
+        "journeys",
+        "coverage"
+      ],
       "properties": {
         "arrivalProfile": {
           "type": "object",
-          "required": ["model", "stages"],
+          "required": [
+            "model",
+            "stages"
+          ],
           "properties": {
-            "model": { "enum": ["open", "closed"] },
+            "model": {
+              "enum": [
+                "open",
+                "closed"
+              ]
+            },
             "stages": {
               "type": "array",
               "minItems": 1,
               "items": {
                 "type": "object",
-                "required": ["duration", "rate"],
+                "required": [
+                  "duration",
+                  "rate"
+                ],
                 "properties": {
-                  "duration": { "type": "string", "examples": ["5m", "30m"] },
-                  "rate": { "type": "number", "description": "target iterations/s (open) or VUs (closed)" },
-                  "shape": { "enum": ["steady", "ramp_up", "plateau", "ramp_down"], "description": "G3 ramp segment type (informational)" }
+                  "duration": {
+                    "type": "string",
+                    "examples": [
+                      "5m",
+                      "30m"
+                    ]
+                  },
+                  "rate": {
+                    "type": "number",
+                    "description": "target iterations/s (open) or VUs (closed)"
+                  },
+                  "shape": {
+                    "enum": [
+                      "steady",
+                      "ramp_up",
+                      "plateau",
+                      "ramp_down"
+                    ],
+                    "description": "G3 ramp segment type (informational)"
+                  }
                 }
               }
             },
             "littlesLawCheck": {
               "type": "object",
               "properties": {
-                "expectedConcurrency": { "type": "number" },
-                "observedConcurrency": { "type": "number" },
-                "ratio": { "type": "number" }
+                "expectedConcurrency": {
+                  "type": "number"
+                },
+                "observedConcurrency": {
+                  "type": "number"
+                },
+                "ratio": {
+                  "type": "number"
+                }
               }
             }
           }
@@ -126,65 +327,195 @@
           "minItems": 1,
           "items": {
             "type": "object",
-            "required": ["id", "weight", "entrypoint", "steps", "baseline"],
+            "required": [
+              "id",
+              "weight",
+              "entrypoint",
+              "steps",
+              "baseline"
+            ],
             "properties": {
-              "id": { "type": "string" },
-              "description": { "type": "string" },
-              "weight": { "type": "number", "minimum": 0, "maximum": 1 },
-              "entrypoint": { "type": "string", "description": "entry span name, e.g. POST /cart/checkout" },
-              "codeRef": { "type": "string", "description": "path#symbol of entry handler" },
-              "unlinked": { "type": "boolean", "default": false },
-              "evidenceSource": { "enum": ["span", "accesslog", "both"], "description": "G0 per-journey evidence tag" },
-              "spanless": { "type": "boolean", "default": false, "description": "true when seen only in access logs" },
+              "id": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "weight": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "entrypoint": {
+                "type": "string",
+                "description": "entry span name, e.g. POST /cart/checkout"
+              },
+              "codeRef": {
+                "type": "string",
+                "description": "path#symbol of entry handler"
+              },
+              "unlinked": {
+                "type": "boolean",
+                "default": false
+              },
+              "evidenceSource": {
+                "enum": [
+                  "span",
+                  "accesslog",
+                  "both"
+                ],
+                "description": "G0 per-journey evidence tag"
+              },
+              "spanless": {
+                "type": "boolean",
+                "default": false,
+                "description": "true when seen only in access logs"
+              },
               "steps": {
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "required": ["id", "service", "operation", "callType"],
+                  "required": [
+                    "id",
+                    "service",
+                    "operation",
+                    "callType"
+                  ],
                   "properties": {
-                    "id": { "type": "string" },
-                    "service": { "type": "string" },
-                    "operation": { "type": "string" },
-                    "callType": { "enum": ["http", "grpc", "db", "mq", "cache"] },
-                    "codeRef": { "type": "string" },
-                    "payloadRef": { "type": "string", "description": "key into spec.payloads" },
+                    "id": {
+                      "type": "string"
+                    },
+                    "service": {
+                      "type": "string"
+                    },
+                    "operation": {
+                      "type": "string"
+                    },
+                    "callType": {
+                      "enum": [
+                        "http",
+                        "grpc",
+                        "db",
+                        "mq",
+                        "cache"
+                      ]
+                    },
+                    "codeRef": {
+                      "type": "string"
+                    },
+                    "payloadRef": {
+                      "type": "string",
+                      "description": "key into spec.payloads"
+                    },
                     "request": {
                       "type": "object",
-                      "description": "§4 v1.1 G-R1 (additive, optional): structured request so a renderer need not string-parse `operation`. When absent, renderers parse `operation` (\"POST /api/cart\").",
+                      "description": "\u00a74 v1.1 G-R1 (additive, optional): structured request so a renderer need not string-parse `operation`. When absent, renderers parse `operation` (\"POST /api/cart\").",
                       "properties": {
-                        "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] },
-                        "pathTemplate": { "type": "string", "description": "path with {param} placeholders, e.g. /api/products/{id}" },
-                        "queryParams": { "type": "object", "additionalProperties": { "type": "string" } },
-                        "headers": { "type": "object", "additionalProperties": { "type": "string" } },
-                        "bodyPayloadRef": { "type": "string", "description": "key into spec.payloads for the request body (defaults to payloadRef)" }
+                        "method": {
+                          "enum": [
+                            "GET",
+                            "POST",
+                            "PUT",
+                            "PATCH",
+                            "DELETE",
+                            "HEAD",
+                            "OPTIONS"
+                          ]
+                        },
+                        "pathTemplate": {
+                          "type": "string",
+                          "description": "path with {param} placeholders, e.g. /api/products/{id}"
+                        },
+                        "queryParams": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "headers": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "string"
+                          }
+                        },
+                        "bodyPayloadRef": {
+                          "type": "string",
+                          "description": "key into spec.payloads for the request body (defaults to payloadRef)"
+                        }
                       }
                     },
-                    "evidenceSource": { "enum": ["span", "accesslog", "both"] },
-                    "spanless": { "type": "boolean", "default": false },
-                    "thinkTime": { "$ref": "#/definitions/thinkTime" },
-                    "dependsOn": { "type": "array", "items": { "type": "string" } },
+                    "evidenceSource": {
+                      "enum": [
+                        "span",
+                        "accesslog",
+                        "both"
+                      ]
+                    },
+                    "spanless": {
+                      "type": "boolean",
+                      "default": false
+                    },
+                    "thinkTime": {
+                      "$ref": "#/definitions/thinkTime"
+                    },
+                    "dependsOn": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
                     "correlates": {
                       "type": "array",
                       "description": "data-flow edges from prior steps (G2)",
                       "items": {
                         "type": "object",
-                        "required": ["sourceStepId", "extract", "inject"],
+                        "required": [
+                          "sourceStepId",
+                          "extract",
+                          "inject"
+                        ],
                         "properties": {
-                          "sourceStepId": { "type": "string" },
+                          "sourceStepId": {
+                            "type": "string"
+                          },
                           "extract": {
                             "type": "object",
-                            "required": ["from", "path"],
+                            "required": [
+                              "from",
+                              "path"
+                            ],
                             "properties": {
-                              "from": { "enum": ["body_json", "header", "body_html", "body_regex"] },
-                              "path": { "type": "string" }
+                              "from": {
+                                "enum": [
+                                  "body_json",
+                                  "header",
+                                  "body_html",
+                                  "body_regex"
+                                ]
+                              },
+                              "path": {
+                                "type": "string"
+                              }
                             }
                           },
                           "inject": {
                             "type": "object",
-                            "required": ["into", "as"],
+                            "required": [
+                              "into",
+                              "as"
+                            ],
                             "properties": {
-                              "into": { "enum": ["header", "path_param", "query_param", "body_field"] },
-                              "as": { "type": "string" }
+                              "into": {
+                                "enum": [
+                                  "header",
+                                  "path_param",
+                                  "query_param",
+                                  "body_field"
+                                ]
+                              },
+                              "as": {
+                                "type": "string"
+                              }
                             }
                           }
                         }
@@ -193,41 +524,83 @@
                   }
                 }
               },
-              "baseline": { "$ref": "#/definitions/baseline" }
+              "baseline": {
+                "$ref": "#/definitions/baseline"
+              }
             }
           }
         },
         "payloads": {
           "type": "object",
           "description": "synthetic payload pools keyed by id",
-          "additionalProperties": { "$ref": "#/definitions/payloadSpec" }
+          "additionalProperties": {
+            "$ref": "#/definitions/payloadSpec"
+          }
         },
         "caps": {
           "type": "object",
           "properties": {
-            "maxRps": { "type": "number" },
-            "maxVus": { "type": "number" },
-            "maxDuration": { "type": "string" }
+            "maxRps": {
+              "type": "number"
+            },
+            "maxVus": {
+              "type": "number"
+            },
+            "maxDuration": {
+              "type": "string"
+            }
           }
         },
-        "coverage": { "type": "number", "minimum": 0, "maximum": 1 }
+        "coverage": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "status": {
       "type": "object",
-      "required": ["revision"],
+      "required": [
+        "revision"
+      ],
       "properties": {
-        "revision": { "type": "integer", "minimum": 1 },
-        "hash": { "type": "string", "description": "sha256 of canonicalized spec" },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "hash": {
+          "type": "string",
+          "description": "sha256 of canonicalized spec"
+        },
         "approval": {
           "type": "object",
-          "required": ["revision", "decision", "decisionBy", "decisionAt"],
+          "required": [
+            "revision",
+            "decision",
+            "decisionBy",
+            "decisionAt"
+          ],
           "properties": {
-            "revision": { "type": "integer" },
-            "decision": { "enum": ["approved", "adjusted"] },
-            "decisionBy": { "type": "string" },
-            "decisionAt": { "type": "string", "format": "date-time" },
-            "confirmationRef": { "type": "string", "description": "approval/confirmation reference id" }
+            "revision": {
+              "type": "integer"
+            },
+            "decision": {
+              "enum": [
+                "approved",
+                "adjusted"
+              ]
+            },
+            "decisionBy": {
+              "type": "string"
+            },
+            "decisionAt": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "confirmationRef": {
+              "type": "string",
+              "description": "approval/confirmation reference id"
+            }
           }
         }
       }
@@ -236,63 +609,166 @@
   "definitions": {
     "thinkTime": {
       "type": "object",
-      "required": ["distribution"],
+      "required": [
+        "distribution"
+      ],
       "properties": {
-        "distribution": { "enum": ["constant", "uniform", "exponential", "empirical"] },
-        "meanMs": { "type": "number" },
-        "minMs": { "type": "number" },
-        "maxMs": { "type": "number" },
-        "samples": { "type": "array", "items": { "type": "number" }, "description": "for empirical" }
+        "distribution": {
+          "enum": [
+            "constant",
+            "uniform",
+            "exponential",
+            "empirical"
+          ]
+        },
+        "meanMs": {
+          "type": "number"
+        },
+        "minMs": {
+          "type": "number"
+        },
+        "maxMs": {
+          "type": "number"
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "for empirical"
+        }
       }
     },
     "baseline": {
       "type": "object",
-      "required": ["p50Ms", "p95Ms", "p99Ms", "errorRate"],
+      "required": [
+        "p50Ms",
+        "p95Ms",
+        "p99Ms",
+        "errorRate"
+      ],
       "properties": {
-        "p50Ms": { "type": "number" },
-        "p95Ms": { "type": "number" },
-        "p99Ms": { "type": "number" },
-        "errorRate": { "type": "number", "minimum": 0, "maximum": 1 },
-        "arrivalShare": { "type": "number" }
+        "p50Ms": {
+          "type": "number"
+        },
+        "p95Ms": {
+          "type": "number"
+        },
+        "p99Ms": {
+          "type": "number"
+        },
+        "errorRate": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "arrivalShare": {
+          "type": "number"
+        }
       }
     },
     "payloadSpec": {
       "type": "object",
-      "required": ["fields"],
+      "required": [
+        "fields"
+      ],
       "properties": {
         "fields": {
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["name", "type"],
+            "required": [
+              "name",
+              "type"
+            ],
             "properties": {
-              "name": { "type": "string" },
-              "type": { "enum": ["string", "int", "float", "enum", "uuid", "timestamp", "null"] },
-              "generator": { "type": "string", "examples": ["random", "sequence", "faker:firstName", "const"] },
-              "values": { "type": "array" },
-              "distribution": { "enum": ["uniform", "weighted", "normal", "zipf"] },
-              "optional": { "type": "boolean", "default": false },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "enum": [
+                  "string",
+                  "int",
+                  "float",
+                  "enum",
+                  "uuid",
+                  "timestamp",
+                  "null"
+                ]
+              },
+              "generator": {
+                "type": "string",
+                "examples": [
+                  "random",
+                  "sequence",
+                  "faker:firstName",
+                  "const"
+                ]
+              },
+              "values": {
+                "type": "array"
+              },
+              "distribution": {
+                "enum": [
+                  "uniform",
+                  "weighted",
+                  "normal",
+                  "zipf"
+                ]
+              },
+              "optional": {
+                "type": "boolean",
+                "default": false
+              },
               "target": {
                 "type": "object",
-                "description": "§4 v1.1 G-P1 (additive, optional): request-location binding (mirrors correlates.inject). When absent, the field is assumed to go into the request body under its own name.",
-                "required": ["into"],
+                "description": "\u00a74 v1.1 G-P1 (additive, optional): request-location binding (mirrors correlates.inject). When absent, the field is assumed to go into the request body under its own name.",
+                "required": [
+                  "into"
+                ],
                 "properties": {
-                  "into": { "enum": ["body_field", "query_param", "path_param", "header"] },
-                  "as": { "type": "string", "description": "destination name (defaults to the field name)" }
+                  "into": {
+                    "enum": [
+                      "body_field",
+                      "query_param",
+                      "path_param",
+                      "header"
+                    ]
+                  },
+                  "as": {
+                    "type": "string",
+                    "description": "destination name (defaults to the field name)"
+                  }
                 }
               }
             }
           }
         },
-        "seed": { "type": "integer" },
+        "seed": {
+          "type": "integer"
+        },
         "cacheProfile": {
           "type": "object",
           "description": "G4 cache-avoidance / hit-ratio targeting",
           "properties": {
-            "targetHitRatio": { "type": "number", "minimum": 0, "maximum": 1, "description": "production cache hit ratio to reproduce" },
-            "keyCardinality": { "type": "integer", "description": "K = unique key pool size (derived from sizing math: R x T x m_prod at minimum)" },
-            "distributionAlpha": { "type": "number", "description": "Zipf alpha fitted from production key-access telemetry (omit for uniform)" },
-            "backingStoreSeeded": { "type": "boolean", "description": "true when the target DB/store has been seeded to production volume" }
+            "targetHitRatio": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1,
+              "description": "production cache hit ratio to reproduce"
+            },
+            "keyCardinality": {
+              "type": "integer",
+              "description": "K = unique key pool size (derived from sizing math: R x T x m_prod at minimum)"
+            },
+            "distributionAlpha": {
+              "type": "number",
+              "description": "Zipf alpha fitted from production key-access telemetry (omit for uniform)"
+            },
+            "backingStoreSeeded": {
+              "type": "boolean",
+              "description": "true when the target DB/store has been seeded to production volume"
+            }
           }
         }
       }

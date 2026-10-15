@@ -33,6 +33,17 @@ the DQL and injects the rows — no telemetry I/O in the library.
 
 ## Workflow
 
+0. **Environment probe — MANDATORY, fail-closed (ISI-5928).** Before ANY extraction, run
+   `python3 scripts/env_probe.py --context <ctx> [--service <name>] [--window 3h]`. It
+   verifies (a) `dtctl` is installed, (b) the DQL backend is reachable + authenticated for
+   the context, (c) the target service is observed in the window (no `--service` → it
+   prints observed entry services and asks you to pin one — never a silent choice). On any
+   failure it exits non-zero with the exact remediation. **There is no fallback**: the
+   skill never silently uses a bundled fixture, an existing `workload-model.json`, or an
+   `examples/` sample as extraction input. Demo data is reachable ONLY through the explicit
+   `workload-engine --demo` opt-in (see *Demo data policy* below). Copy the probe's printed
+   `provenanceTemplate` into the neutral extract as its `provenance` field — the model gets
+   stamped `extracted-from: <query pack> on tenant <Y> (<window>)` and G0 requires it.
 1. **Timeframe sanity.** Confirm the window is deploy-free and incident-free (DQL on deployment
    events / problem records). Shrink/shift and record why if not. Record exclusions.
 2. **Dual-source extraction** (run the DQL pack below live; confirm every field name in YOUR tenant):
@@ -86,6 +97,23 @@ the DQL and injects the rows — no telemetry I/O in the library.
 
 `scripts/build_example.py` is the worked end-to-end reference (synthetic example extraction →
 artifacts in `out/example-frontend/`; run it to see the whole pipeline without a tenant).
+Its output is stamped `provenance.kind=demo-sample` like every demo artifact.
+
+## Demo data policy & provenance (ISI-5928)
+
+- **Every model carries `metadata.source.provenance`**: `kind=extracted` (with
+  `extractedFrom: "<query pack> on tenant <Y> (<window>)"`, `queryPack`, `tenant`, `window`,
+  `ranAtIso`, `dqlRunLive`) or `kind=demo-sample` (with a `note`). G0 **fails closed** on any
+  model without provenance — there is no "unknown-but-shipped" kind.
+- **Demo/synthetic data is quarantined**: it lives under `examples/` and the bundled fixture,
+  is labeled `demo-sample`, and renders with an unmissable DEMO banner in the proposal.
+  Downstream consumers (`k6-synthesis`, the shared renderer contract) **refuse demo-sample
+  models unless explicitly opted in** (`--demo` flag or `WORKLOAD_MODEL_ALLOW_DEMO=1`).
+- **The engine CLI is fail-closed**: `workload-engine --out <dir>` without `--extract` and
+  without `--demo` exits 2 with guidance. It never silently falls back to the synthetic
+  fixture. `--demo` output is stamped demo-sample.
+- **The `dql-live` G0 criterion is honest**: derived from provenance, never hardcoded —
+  a demo-sample model records `n/a — no live-DQL claim`, not a silent pass.
 
 ## DQL pack (validated field names; confirm on YOUR tenant)
 
@@ -168,10 +196,15 @@ fetch user.sessions, from: $DT_TIMEFRAME
 schema-valid · coverage ≥0.80 · journeys ∈ [1,6] · every step `codeRef` or `unlinked` ·
 every journey server-span baseline (p50/p95/p99/errorRate) · Little's Law ratio ∈ [0.5,2.0] ·
 every `dependsOn` has a `correlates` edge (G2) · `cacheProfile.targetHitRatio>0` ⇒ `keyCardinality` (G4) ·
-caps declared · all DQL run live · **access-log availability `available`, OR `unavailable` with a
-spans-only caveat in the proposal** · every journey tagged `evidenceSource` (span/accesslog/both).
+caps declared · all DQL run live (**honest per provenance**: extracted ⇒ attested via
+`provenance.dqlRunLive`; demo-sample ⇒ `n/a`, no live claim) · **access-log availability
+`available`, OR `unavailable` with a spans-only caveat in the proposal** · every journey
+tagged `evidenceSource` (span/accesslog/both) · **provenance declared** (`extracted` with
+tenant/window/queryPack, or `demo-sample`) — fail-closed without it (ISI-5928).
 
-Run: `python3 scripts/g0_gate.py <model.json> <proposal.md>` (exit 0 iff G0 passes).
+Run: `python3 scripts/g0_gate.py <model.json> <proposal.md>` (exit 0 iff G0 passes;
+`dql_run_live` derives from the model's provenance — add `--attest-live` only if you,
+the operator, personally attest the pack ran live on a pre-provenance extracted model).
 
 ## Residual caveats (MUST appear in every proposal — never silently dropped)
 
@@ -187,7 +220,9 @@ Run: `python3 scripts/g0_gate.py <model.json> <proposal.md>` (exit 0 iff G0 pass
 - `scripts/clustering.py` — G1 Jaccard + stem sub-clustering / ≤6 cap
 - `scripts/shaping.py` — G3 pace / Little's Law / CoV ramp shaping
 - `scripts/emit.py` — model assembly + proposal rendering + canonical hash
-- `scripts/g0_gate.py` — G0 self-validation (schema + 12 exit criteria)
+- `scripts/env_probe.py` — MANDATORY fail-closed environment probe (dtctl present · DQL
+  reachable/authenticated · target observed; prints the provenance template) — ISI-5928
+- `scripts/g0_gate.py` — G0 self-validation (schema + 13 exit criteria incl. provenance)
 - `scripts/rum_sessions.py` / `scripts/session_stitch.py` / `scripts/source_merge.py` —
   step 2c session signals (mirrored as standalone CLIs in `/utilities`)
 - `scripts/build_example.py` — worked end-to-end example on the synthetic fixture

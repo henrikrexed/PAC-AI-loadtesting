@@ -31,8 +31,10 @@ python3 -c "import json,jsonschema; \
   json.load(open('skills/workload-model/scripts/schema.json'))); print('schema OK')"
 
 # render it through k6-synthesis (V2a static gate must pass, exit 0)
+# --demo: the example model is stamped provenance.kind=demo-sample (ISI-5928);
+# renderers refuse demo data unless you explicitly opt in.
 cd skills/k6-synthesis
-node bin/synthesize.mjs ../../examples/workload-model.example.json /tmp/example-out
+node bin/synthesize.mjs ../../examples/workload-model.example.json /tmp/example-out --demo
 ```
 
 The model carries `status.approval.decision == "approved"` so synthesis does not
@@ -44,5 +46,9 @@ not a hand-edit.
 
 `workload-model.example.json` is a valid input to **every** renderer in this repo
 (`k6-synthesis`, `jmeter-synthesis`, `locust-synthesis`, `gatling-synthesis`) via
-the shared §4 renderer contract — swap in your own service names, baselines, and
-arrival profile and point a renderer at it.
+the shared §4 renderer contract — but because it is stamped
+`metadata.source.provenance.kind = "demo-sample"` (ISI-5928), every renderer **refuses
+it unless you explicitly opt in** (`--demo` flag or `WORKLOAD_MODEL_ALLOW_DEMO=1`).
+For a real target, extract your own telemetry: `skills/workload-model/scripts/env_probe.py`
+(fail-closed — no silent fallback to these samples), then swap in your service names,
+baselines, and arrival profile.

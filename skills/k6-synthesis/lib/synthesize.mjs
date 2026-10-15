@@ -5,7 +5,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadModel, assertApproved, poolKinds } from './model.mjs';
+import { loadModel, assertApproved, assertNotDemo, poolKinds } from './model.mjs';
 import { generatePool } from './payloads.mjs';
 import { generateScript } from './codegen.mjs';
 import { durationToSeconds } from './arrival.mjs';
@@ -77,11 +77,16 @@ export function buildArtifacts(model, { ttlSec } = {}) {
  * Run the full synthesis. Returns { model, scriptPath, outDir, pools, v2a, warnings }.
  * Throws on the V1 gate (unapproved model) before writing anything.
  */
-export function synthesize(modelPathOrObj, outDir, { ttlSec } = {}) {
+export function synthesize(modelPathOrObj, outDir, { ttlSec, allowDemo } = {}) {
   const model = loadModel(modelPathOrObj);
+  // ISI-5928 demo guard — BEFORE V1: demo data is refused even if a (hand-edited)
+  // approval block is present, unless the operator explicitly opted in.
+  const { provenanceWarning } = assertNotDemo(model, { allowDemo });
   assertApproved(model); // V1 gate — refuse unapproved models
+  const warnings = provenanceWarning ? [provenanceWarning] : [];
 
-  const { pools, options, maxRate, warnings, files, source } = buildArtifacts(model, { ttlSec });
+  const { pools, options, maxRate, warnings: buildWarnings, files, source } = buildArtifacts(model, { ttlSec });
+  warnings.push(...buildWarnings);
 
   // write every artifact to disk, preserving the relative layout
   for (const f of files) {

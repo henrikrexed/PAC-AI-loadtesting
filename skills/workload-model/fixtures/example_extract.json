@@ -368,5 +368,9 @@
         "errorRate": 0.0
       }
     }
-  ]
+  ],
+  "provenance": {
+    "kind": "demo-sample",
+    "note": "SYNTHETIC fixture \u2014 every number invented for demonstration; no value was measured from a real system. Usable only via explicit --demo opt-in (ISI-5928)."
+  }
 }
